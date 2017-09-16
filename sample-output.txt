@@ -1,0 +1,16 @@
+The_DT cup_NN 's_POS color_NN is_VBZ red_JJ ._.
+The_DT cup_NN is_VBZ red_JJ in_IN color_NN ._.
+The_DT cup_NN is_VBZ red_JJ ._.
+The_DT large_JJ red_JJ block_NN is_VBZ luminous_JJ ._.
+The_DT central_JJ table_NN is_VBZ shimmering_JJ ._.
+The_DT robot_NN is_VBZ below_IN the_DT main_JJ table_NN ._.
+The_DT light_JJ cup_NN is_VBZ next_JJ to_TO the_DT heavy_JJ cup_NN ._.
+The_DT light_JJ cup_NN is_VBZ nearby_RB the_DT heavy_JJ cup_NN ._.
+The_DT light_JJ cup_NN is_VBZ under_IN the_DT heavy_JJ cup_NN ._.
+The_DT light_JJ cup_NN is_VBZ west_NN of_IN the_DT heavy_JJ cup_NN ._.
+The_DT light_JJ cup_NN is_VBZ to_TO the_DT west_NN of_IN the_DT heavy_JJ cup_NN ._.
+The_DT salesperson_NN is_VBZ tearing_VBG up_RP the_DT red_JJ folder_NN ._.
+The_DT authoritative_JJ salesperson_NN is_VBZ installing_VBG the_DT printer_NN on_IN the_DT pale_JJ desk_NN ._.
+The_DT unimportant_JJ engineer_NN is_VBZ polishing_VBG the_DT metal_NN table_NN ._.
+The_DT influential_JJ engineer_NN is_VBZ filing_VBG the_DT solid_JJ green_JJ folder_NN in_IN the_DT dense_JJ white_JJ locker_NN ._.
+The_DT important_JJ engineer_NN is_VBZ balancing_VBG the_DT fragile_JJ cup_NN on_IN the_DT lightweight_JJ ledger_NN ._.

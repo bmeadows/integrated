@@ -1,0 +1,5 @@
+{occurs(move(rob0,rm2),0), occurs(move(rob0,rm2),3), occurs(move(rob0,rm0),1), occurs(serve(rob0,text0,per0),4), occurs(pickup(rob0,text0),2)}
+
+{occurs(move(rob0,rm2),2), occurs(move(rob0,rm0),0), occurs(serve(rob0,text0,per0),3), occurs(pickup(rob0,text0),1)}
+
+{occurs(move(rob0,rm1),2), occurs(move(rob0,rm2),3), occurs(move(rob0,rm0),0), occurs(serve(rob0,text0,per0),4), occurs(pickup(rob0,text0),1)}

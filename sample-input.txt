@@ -1,0 +1,16 @@
+The cup's color is red.
+The cup is red in color.
+The cup is red.
+The large red block is luminous. 
+The central table is shimmering. 
+The robot is below the main table.
+The light cup is next to the heavy cup.
+The light cup is nearby the heavy cup.
+The light cup is under the heavy cup.
+The light cup is west of the heavy cup.
+The light cup is to the west of the heavy cup.
+The salesperson is tearing up the red folder.
+The authoritative salesperson is installing the printer on the pale desk.
+The unimportant engineer is polishing the metal table.
+The influential engineer is filing the solid green folder in the dense white locker.
+The important engineer is balancing the fragile cup on the lightweight ledger.
