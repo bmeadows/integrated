@@ -1,0 +1,20 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  predicates
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+loc_type(#location, #type).
+role_type(#person, #role).
+obj_status(#object, #status).
+obj_weight(#object, #weight).
+
+holds(#fluent,#step).
+occurs(#action,#step).
+exogenous(#exoaction,#step).
+
+%obs(#fluent, #step).
+%hpd(#action, #step).
+
+success().
+goal(#step). 
+something_happened(#step).
+

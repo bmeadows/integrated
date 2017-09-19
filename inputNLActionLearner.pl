@@ -1,4 +1,4 @@
-:- dynamic unprocessedInputs/1, actionDescription/3, args/1.
+:- dynamic unprocessedInputs/1, exoActionDescription/4, args/1.
 
 :- include('wordnet/wn_s.pl').
 :- include('wordnet/wn_sim.pl').
@@ -8,9 +8,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Examples of 'learnable' action descriptions already known, to demonstrate generalisation
-actionDescription(file(P, F, C), [P, F, C], [manager, book, furniture], [not(in_hand(P,F)),in(F,C),open(C,false)]).
-actionDescription(file_alternative(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,F)),in(F,C),open(C,false)]).
-actionDescription(file(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,C))]).
+exoActionDescription(file(P, F, C), [P, F, C], [manager, book, furniture], [not(in_hand(P,F)),in(F,C),open(C,false)]).
+exoActionDescription(file_alternative(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,F)),in(F,C),open(C,false)]).
+exoActionDescription(file(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,C))]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -40,11 +40,11 @@ The unimportant engineer is polishing the metallic table.
 The important engineer is balancing the breakable cup on the lightweight ledger.
 
 
-actionDescription(file(_9974,_9976,_9978),[_9974,_9976,_9978],[person,item,furniture],[not(in_hand(_9974,_9976)),in(_9976,_9978),open(_9978,false)])
-actionDescription(tear(_8590,_8592),[_8590,_8592],[salesperson,folder],[item_status(_8592,damaged)])
-actionDescription(install(_9254,_9256,_9258),[_9254,_9256,_9258],[salesperson,printer,desk],[loc(_9256,_9258),labelled(_9256,true)])
-actionDescription(polish(_8584,_8586),[_8584,_8586],[engineer,table],[reflectivity(_8586,bright)])
-actionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cup,book],[not(in_hand(_9442,_9444)),loc(_9444,_9446)])
+exoActionDescription(file(_9974,_9976,_9978),[_9974,_9976,_9978],[person,item,furniture],[not(in_hand(_9974,_9976)),in(_9976,_9978),open(_9978,false)])
+exoActionDescription(tear(_8590,_8592),[_8590,_8592],[salesperson,folder],[item_status(_8592,damaged)])
+exoActionDescription(install(_9254,_9256,_9258),[_9254,_9256,_9258],[salesperson,printer,desk],[loc(_9256,_9258),labelled(_9256,true)])
+exoActionDescription(polish(_8584,_8586),[_8584,_8586],[engineer,table],[reflectivity(_8586,bright)])
+exoActionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cup,book],[not(in_hand(_9442,_9444)),loc(_9444,_9446)])
 
 */
 
@@ -100,10 +100,10 @@ learnFromActionDesc([A|B]) :-
 	functor(Head, Action, Length),
 	fillHead(Head, OrderedList, 1),
 	% Assemble parts into one structure
-	GroundedActionDescription = actionDescription(Head, OrderedList, ObjectClassPredicates, LiteralEffects),
+	GroundedActionDescription = exoActionDescription(Head, OrderedList, ObjectClassPredicates, LiteralEffects),
 	% Check if it matches, exactly or partially, against a known structure
 	!,
-	(actionDescription(Head, HeadVariables, OtherClasses, LiteralEffects)
+	(exoActionDescription(Head, HeadVariables, OtherClasses, LiteralEffects)
 	->
 		(reconcile(Head, OrderedList, HeadVariables, ObjectClassPredicates, OtherClasses, LiteralEffects))
 	;
@@ -130,7 +130,7 @@ fillHead(Head, [A|B], Index) :-
 	fillHead(Head, B, I2).
 	
 lift(GroundedActionDescription, LiftedActionDescription) :-
-	GroundedActionDescription = actionDescription(Head, HeadConstants, SortList, EffectsList),
+	GroundedActionDescription = exoActionDescription(Head, HeadConstants, SortList, EffectsList),
 	term_string(Head, HeadString),
 	term_string(EffectsList, EffectsString),
 	args_to_strings(HeadConstants, StringArgList),
@@ -143,7 +143,7 @@ lift(GroundedActionDescription, LiftedActionDescription) :-
 	string_concat(String3, "]", String4),
 	term_string([NewHead,NewEffects], String4),
 	term_variables(NewHead, HeadVariables),
-	LiftedActionDescription = actionDescription(NewHead, HeadVariables, SortList, NewEffects),
+	LiftedActionDescription = exoActionDescription(NewHead, HeadVariables, SortList, NewEffects),
 	prettyprintstars,
 	prettyprint('Adding new action description, lifted: '),
 	prettyprintln(LiftedActionDescription),
@@ -207,8 +207,8 @@ reconcile(Head, HeadConstants, HeadVariables, ObjectClassPredicates, OtherClasse
 	% Find first common ancestor for each
 	reconcileRecursive(ObjectClassPredicates, OtherClasses, New),
 	% Replace known structure
-	retractall(actionDescription(Head, HeadVariables, OtherClasses, LiteralEffects)),
-	GroundedActionDescription = actionDescription(Head, HeadConstants, New, LiteralEffects),
+	retractall(exoActionDescription(Head, HeadVariables, OtherClasses, LiteralEffects)),
+	GroundedActionDescription = exoActionDescription(Head, HeadConstants, New, LiteralEffects),
 	prettyprintln('Reconcile type 2: Generalising with existing action description that partially matches'),
 	prettyprint('=> Argument sorts for existing description: '),
 	prettyprintln(OtherClasses),
@@ -384,5 +384,5 @@ translateAdjThroughWordNet(InitialValue,FinalValue) :- % Similar adjectival sens
 
 translateLearnedActionDescsToPrologRules :-
        tell('learned_action_descs.pl'),
-       listing(actionDescription/4),
+       listing(exoActionDescription/4),
        told.

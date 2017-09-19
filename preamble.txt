@@ -1,0 +1,28 @@
+#const numSteps = 5.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  sorts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+#location = [rm][0..2].
+
+#robot = {rob0}.
+#person = {per0}.
+#entity = #robot + #person.	
+
+#type = {office, library, workshop}.
+#role = {engineer, sales, manager}.
+#status = {damaged, good}.
+#weight = {light, heavy}.
+
+#textbook = {text0}.
+#object = #textbook.
+
+#thing = #object + #entity.
+
+#step = 0..numSteps.
+
+
+%% Fluents
+#inertial_fluent = loc(#thing, #location) + in_hand(#entity, #object).
+#fluent = #inertial_fluent.% + #defined_fluent.

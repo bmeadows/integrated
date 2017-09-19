@@ -8,11 +8,8 @@ construct_sp_file(File) :-
 	readwrite_actions(File),
 	readwrite_predicates(File),
 	readwrite_axioms(File),
-	readwrite_state_constraints(File),
-	readwrite_axioms_meta(File),
-	readwrite_current_state(File),
-	readwrite_static_values(File),
-	readwrite_goal(File),
+	readwrite_state_constraints_meta_and_statics(File),
+	readwrite_current_state_and_goal(File),
 	readwrite_display(File).
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -35,39 +32,35 @@ readwrite_axioms_meta(File) :-
 % The following parts are dynamic and will change
 
 /*
+Use internal list of valid actions, which can be extended through learning.
+Also includes EXOACTIONS, which must be given dynamically.
 */
 readwrite_actions(File) :-
 	direct_readwrite('actions.txt', File).
 
 /*
+Use existing ASP file, and then add learned causal laws and executability conditions (stored in a form convenient for ASP).
 */
 readwrite_axioms(File) :-
 	direct_readwrite('axioms.txt', File).
 
 /*
 List of what holds.
+I suppose the terms are passed back and forth between ASP and other modules?
+And then added to with observations here.
+Plus goal, if it exists.
+ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed. But how to evaluate when goal is met, so remove?
 */
-readwrite_current_state(File) :-
+readwrite_current_state_and_goal(File) :-
 	direct_readwrite('current_state.txt', File).
 
 /*
 While static, these should be generated from a single central data store.
-RRL purports to change them, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
+RRL purports to change statics, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
 Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
 */
-readwrite_static_values(File) :-
-	direct_readwrite('static_values.txt', File).
-
-/*
-While static, these should be generated from a single central data store.
-*/
-readwrite_state_constraints(File) :-
-	direct_readwrite('state_constraints.txt', File).
-
-/*
-*/
-readwrite_goal(File) :-
-	direct_readwrite('goal.txt', File).
+readwrite_state_constraints_meta_and_statics(File) :-
+	direct_readwrite('state_constraints_meta_and_statics.txt', File).
 
 /*
 Change this to include in the printed portion of the answer set

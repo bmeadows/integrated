@@ -1,0 +1,12 @@
+
+holds(loc(rob0, rm1), 0).
+holds(loc(text0, rm0), 0). 
+holds(loc(per0, rm2), 0).
+
+
+%% Goal...
+%goal(I) :- holds(loc(text0, rm1), I), -holds(in_hand(rob0, text0), I).
+goal(I) :- holds(in_hand(per0, text0), I).
+
+
+

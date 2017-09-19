@@ -1,0 +1,5 @@
+#action = move(#robot, #location) + pickup(#robot, #object) 
+	+ putdown(#robot, #object) + serve(#robot, #object, #person).
+
+#exoaction = unknown.
+
