@@ -1,5 +1,5 @@
 #action = move(#robot, #location) + pickup(#robot, #object) 
-	+ putdown(#robot, #object) + serve(#robot, #object, #person).
+	+ putdown(#robot, #object) + serve(#robot, #object, #person) + wait(#robot).
 
 #exoaction = unknown.
 

@@ -1,4 +1,4 @@
-:- dynamic unprocessedInputs/1, exoActionDescription/4, args/1.
+:- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1.
 
 :- include('wordnet/wn_s.pl').
 :- include('wordnet/wn_sim.pl').
@@ -24,10 +24,11 @@ inputLiterals([item_status(fol2,damaged)]).
 
 inputText("The_DT authoritative_JJ salesperson_NN is_VBZ installing_VBG the_DT printer_NN on_IN the_DT light_JJ desk_NN ._.").
 inputLiterals([loc(prin1,desk1),labelled(prin1,true)]).
-*/
-inputText("The_DT unimportant_JJ engineer_NN is_VBZ polishing_VBG the_DT metallic_ADJ table_NN ._.").
-inputLiterals([reflectivity(tab1,bright)]).
 
+obs_ex_action_tagged(	"The_DT unimportant_JJ engineer_NN is_VBZ polishing_VBG the_DT metallic_ADJ table_NN ._.",
+					[reflectivity(tab1,bright)],
+					1).
+*/
 
 /*
 inputText("The_DT important_JJ engineer_NN is_VBZ balancing_VBG the_DT breakable_JJ cup_NN on_IN the_DT lightweight_JJ ledger_NN ._.").
@@ -48,10 +49,6 @@ exoActionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cu
 
 */
 
-
-
-unprocessedInputs([[A,B]]) :- inputText(A), inputLiterals(B).
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 prettyprintln(String) :- prettyprint(String), nl.
@@ -63,15 +60,15 @@ prettyprintstars :- prettyprintln('************************').
 
 %1. Check buffer of unprocessed observations from the previous cycle (or... on interrupt) for tuples <string, [0 or more logical literals]>
 learnFromDescs :-
-	unprocessedInputs(X),
-	learnFromActionDesc(X),
-	retractall(unprocessedInputs(X)).
+	findall([A,B,C], obs_ex_action_tagged(A,B,C), X),
+	learnFromActionDescs(X),
+	retractall(obs_ex_action_tagged(_,_,_)).
 
 %2. Perform the following for each tuple in turn
 %3. Parse string into list of POS-tagged words
-learnFromActionDesc([]) :- translateLearnedActionDescsToPrologRules.
-learnFromActionDesc([A|B]) :-
-	A = [String,LiteralEffects],
+learnFromActionDescs([]) :- translateLearnedActionDescsToPrologRules.
+learnFromActionDescs([A|B]) :-
+	A = [String,LiteralEffects,_Step],
 	prettyprintstars,
 	prettyprint('Tagged input string: '),
 	prettyprintln(String),
@@ -110,15 +107,16 @@ learnFromActionDesc([A|B]) :-
 		% Lift structure
 		(lift(GroundedActionDescription, LiftedActionDescription), assert(LiftedActionDescription))
 	),
+	assert(exogenous(observed_occurrence_of_instance,something)),
 	!,
-	learnFromActionDesc(B).
-learnFromActionDesc([A|B]) :-
+	learnFromActionDescs(B).
+learnFromActionDescs([A|B]) :-
 	prettyprintstars,
 	prettyprint('Failed to learn from '),
 	prettyprint(A),
 	prettyprintln('. Discarding and continuing.'),
 	prettyprintstars,
-	learnFromActionDesc(B).
+	learnFromActionDescs(B).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%	
@@ -385,4 +383,7 @@ translateAdjThroughWordNet(InitialValue,FinalValue) :- % Similar adjectival sens
 translateLearnedActionDescsToPrologRules :-
        tell('learned_action_descs.pl'),
        listing(exoActionDescription/4),
+       told,
+       tell('exogenous_events.pl'),
+       listing(exogenous/2),
        told.
