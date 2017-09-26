@@ -18,8 +18,6 @@ construct_sp_file(File) :-
 
 % The following parts can be considered static; read them directly from a file
 
-readwrite_preamble(File) :-
-	direct_readwrite('preamble.txt', File).
 readwrite_predicates(File) :-
 	direct_readwrite('predicates.txt', File).
 readwrite_axioms_meta(File) :-
@@ -30,6 +28,25 @@ readwrite_axioms_meta(File) :-
 % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 % The following parts are dynamic and will change
+
+readwrite_preamble(File) :-
+	currentTime(CurrentTime),
+	number_of_ASP_steps_to_lookahead(N),
+	Steps is CurrentTime + N,
+	open(File, append, O),
+	write(O, "#const numSteps = "),
+	write(O, Steps),
+	write(O, "."),
+	close(O),
+	direct_readwrite('preamble.txt', File).
+/* Deprecated
+	open(File, append, O2),
+	write(O2, "#step = "),
+	write(O2, CurrentTime),
+	write(O2, "..numSteps."),
+	close(O2).
+*/
+	
 
 /*
 Use internal list of valid actions, which can be extended through learning.

@@ -1,4 +1,4 @@
-#const numSteps = 5.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   sorts
@@ -22,7 +22,3 @@
 
 #step = 0..numSteps.
 
-
-%% Fluents
-#inertial_fluent = loc(#thing, #location) + in_hand(#entity, #object).
-#fluent = #inertial_fluent.% + #defined_fluent.
