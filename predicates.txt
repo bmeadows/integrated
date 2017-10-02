@@ -7,12 +7,16 @@ role_type(#person, #role).
 obj_status(#object, #status).
 obj_weight(#object, #weight).
 
-holds(#fluent,#step).
-occurs(#action,#step).
+is_defined(#fluent).
+
+% Beliefs
+holds(#fluent,#step). % Belief
+occurs(#action,#step). % Plan generation
 exogenous(#exoaction,#step).
 
-%obs(#fluent, #step).
-%hpd(#action, #step).
+% Observations
+obs(#fluent, #boolean, #step).
+hpd(#action, #step).
 
 success().
 goal(#step). 

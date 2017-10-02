@@ -4,21 +4,31 @@
   sorts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#location = [rm][0..2].
+#location = [rm][0..3].
 
-#robot = {rob0}.
-#person = {per0}.
+#robot = {rob1}.
+#person = [p][0..3].
 #entity = #robot + #person.	
 
 #type = {office, library, workshop}.
 #role = {engineer, sales, manager}.
-#status = {damaged, good}.
+#status = {damaged, intact}.
 #weight = {light, heavy}.
+#item_surface = {hard, brittle}.
+#robot_arm_type = {pneumatic, electromagnetic}.
 
-#textbook = {text0}.
-#object = #textbook.
+#cup = {cup1}.
+#book = {book1}.
+#printer = {prin1}.
+#item = #cup + #book + #printer.
+#shelf = {shelf1, shelf2}.
+#desk = {desk1}.
+#table = {tab1}.
+#furniture = #shelf + #desk + #table.
+#object = #item + #furniture.
 
 #thing = #object + #entity.
 
+#boolean = {true, false}.
 #step = 0..numSteps.
 

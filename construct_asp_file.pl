@@ -1,4 +1,15 @@
+/*
+Dynamic content:
+	holds_at_zero(L) -> holds(L,0)
+	domain_attr(A) -> A
+	obs(X,Y,Z) -> obs(X,Y,Z)
+	hpd(Action, T) -> hpd(Action, T)
+*/
 
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+ % % % % % % % % % % % % % % % % % % % % % % % % % %
+% % % % % % % % % % % % % % % % % % % % % % % % % % %
+	
 %update_asp :- construct_sp_file('assembled.pl').
 
 construct_sp_file(File) :-
@@ -20,8 +31,6 @@ construct_sp_file(File) :-
 
 readwrite_predicates(File) :-
 	direct_readwrite('predicates.txt', File).
-readwrite_axioms_meta(File) :-
-	direct_readwrite('axioms_meta.txt', File).
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %
  % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -69,6 +78,11 @@ Plus goal, if it exists.
 ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed. But how to evaluate when goal is met, so remove?
 */
 readwrite_current_state_and_goal(File) :-
+
+	holds_at_zero(L) -> holds(L,0)
+	obs(X,Y,Z) -> obs(X,Y,Z)
+	hpd(Action, T) -> hpd(Action, T)
+	
 	direct_readwrite('current_state.txt', File).
 
 /*
@@ -77,7 +91,9 @@ RRL purports to change statics, but consider that to be relabelling or interacti
 Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
 */
 readwrite_state_constraints_meta_and_statics(File) :-
-	direct_readwrite('state_constraints_meta_and_statics.txt', File).
+	direct_readwrite('state_constraints_meta_and_statics.txt', File)
+	domain_attr(A) -> A
+	
 
 /*
 Change this to include in the printed portion of the answer set

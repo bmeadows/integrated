@@ -1,7 +1,7 @@
 
-holds(loc(rob0, rm1), 0).
-holds(loc(text0, rm0), 0). 
-holds(loc(per0, rm2), 0).
+%holds(loc(rob0, rm1), 0).
+%holds(loc(text0, rm0), 0). 
+%holds(loc(per0, rm2), 0).
 
 
 %% Goal...

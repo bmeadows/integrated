@@ -1,0 +1,84 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% State Constraints
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Any object exists in only one location...
+-holds(loc(O, L2), I) :- holds(loc(O, L1), I), L1!=L2.
+
+%% If a robot is holding an object, they have the same location...
+holds(loc(O, L), I) :- holds(loc(R, L), I), holds(in_hand(R, O), I).
+
+%% Only one entity can have an object in hand...
+-holds(in_hand(E2, O), I) :- holds(in_hand(E1, O), I), E1 != E2.
+
+%% Only one object can be held at any time...
+-holds(in_hand(E, O2), I) :- holds(in_hand(E, O1), I), O1 != O2.
+
+%% If thing is not at a location initially, assume not there ...
+-holds(loc(Th, L), 0) :- not holds(loc(Th, L),0), #thing(Th). 
+
+%% Location type, room type, status and weight have unique values...
+-loc_type(L, T2) :- loc_type(L, T1), T1 != T2. 
+-role_type(P, RT2) :- role_type(P, RT1), RT1 != RT2.
+-obj_status(O, S2) :- obj_status(O, S1), S1 != S2.
+-obj_weight(O, W2) :- obj_weight(O, W1), W1 != W2.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Inertial axiom + CWA
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% General inertia axioms...
+holds(F,I+1) :- #inertial_fluent(F),
+                holds(F,I),
+                not -holds(F,I+1).
+
+-holds(F,I+1) :- #inertial_fluent(F),
+                 -holds(F,I),
+                 not holds(F,I+1).
+                 
+%% CWA for actions...
+-occurs(A,I) :- not occurs(A,I).
+
+%% CWA for exogenous actions...
+-exogenous(E,I) :- not exogenous(E,I).
+
+%% CWA for defined fluents...
+%-holds(F, I) :- #defined_fluent(F), not holds(F, I). 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Planning Module...
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%% Failure is not an option...
+success :- goal(I).
+:- not success. 
+
+%% Cannot be idle while goal remains unachieved...
+occurs(A, I) | -occurs(A, I) :- not goal(I). 
+
+%% Cannot execute two actions at the same time...
+:- occurs(A1,I), occurs(A2,I), A1 != A2.
+
+something_happened(I) :- occurs(A, I).
+
+:- not goal(I),
+   not something_happened(I).
+
+%:- goal(I), goal(I-1),
+%   J < I,
+%   not something_happened(J).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Test
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%obj_weight(text0, heavy).
+%loc_type(rm2, workshop).
+
+%obj_status(text0, good).
+%role_type(per0, engineer).
+
+

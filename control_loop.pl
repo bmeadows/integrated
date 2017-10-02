@@ -6,7 +6,7 @@
 :- include(construct_asp_file).
 :- include(inputNLActionLearner). % exclude this to remove startup lag associated with wordnet
 
-:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1.
+:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1, obs/3, hpd/2, expected_effects/3.
 
 inPlanMode(true).
 learningMode(off). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
@@ -22,6 +22,19 @@ currentTime_unaltered(5).
 number_of_ASP_steps_to_lookahead(5).
 goal(I, [holds(in_hand(per0, text0), I)]).
 agent(rob1).
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%% Section N: Attr %%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+domain_attr(obj_weight(text0, light)).
+domain_attr(obj_status(text0, good)).
+domain_attr(role_type(per0, engineer)).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -48,16 +61,40 @@ get_observations :-
 	currentTime(T),
 	prettyprint('Time '),
 	prettyprint(T),
+	% Note that the last step's action and its effects will only be observed if default or next is chosen
 	prettyprintln('. Please give list of observations (or "d." for default or "n." for next from list): '),
 	read(Input),
 	prettyprintln(' '),
 	process_observations(Input).
 	
-process_observations(d) :- !, true.
-process_observations(n) :- !, true.
-process_observations([_A|_B]) :- !, true.
+process_observations(d) :- !, confirm_expected_effects.
+process_observations(n) :- !, confirm_expected_effects.
+process_observations([_A|_B]) :- !, prettyprintln('TODO!'), true.
 process_observations(_) :- get_observations.
 
+% Anticipated effects of last cycle's actions are put into form obs(X,true,newtime) for ASP if 'default' or 'next' is chosen
+confirm_expected_effects :-
+	currentTime(TNew),
+	TOld is TNew-1,
+	expected_effects(Action,Effects,TOld),
+	prettyprint('New observations: '),
+	prettyprintln(Effects),
+	expected_to_obs(Effects,TNew),
+	assert(hpd(Action, TOld)),
+	!.
+confirm_expected_effects.	
+	
+expected_to_obs([],_).
+expected_to_obs([fluent(A)|B],T) :-
+	!,
+	assert(obs(A,true,T)),
+	expected_to_obs(B,T).
+expected_to_obs([not(fluent(A))|B],T) :-
+	!,
+	assert(obs(A,false,T)),
+	expected_to_obs(B,T).
+
+	
 	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%% Section 3: Main %%%%%%%%%%%%%%%%%%
@@ -187,7 +224,14 @@ handle_answer_sets(List) :-
 	% 4. Update current beliefs
 	retractall(currently_holds(_)),
 	assertallcurrent(Current),
-	% 5. Get first found plan step and store it as next_plan_step(NPS); note handle_answer_sets is only called when 1 or more exists
+	% 5. Get things that held at time zero
+	findall( Literal,
+			not(( member(SubList,List), not(member(holds(Literal,0),SubList)) )),
+			TimeZero),
+	% 6. Record what was believed at time zero
+	retractall(holds_at_zero(_)),
+	assertallzero(TimeZero),
+	% 7. Get first found plan step and store it as next_plan_step(NPS); note handle_answer_sets is only called when 1 or more exists
 	% However, there might be no plan step because there is no goal
 	retractall(next_plan_step(_)),
 	List = [First|_],
@@ -206,6 +250,11 @@ reset_times :-
 	assert(currentTime(1)).
 	
 	
+assertallzero([]).
+assertallzero([A|B]) :-
+	assert(holds_at_zero(A)),
+	assertallzero(B).
+
 assertallcurrent([]).
 assertallcurrent([A|B]) :-
 	assert(currently_holds(A)),
@@ -218,14 +267,44 @@ nowExecutePlanStep :-
 	% Give this planned action to agent knowledge and record (and print) expected effects
 	find_expected_effects(NPS,Effects),
 	currentTime(T),
-	assert(expected_effects(Effects,T)).
+	assert(expected_effects(NPS,Effects,T)).
 nowExecutePlanStep :-
 	trace.
 
 find_expected_effects(Action, Effects) :-
-	causal_law(Action, Conditions, Effects),
-	% Conditions is a list of fluent(), attr(), not(fluent()), not(attr())
-	check all the conditions hold.
+	find_expected_effects_each(Action, Effects),
+	!.
+find_expected_effects(Action, _Effects) :-
+	prettyprint('No agent model (causal law) found for '),
+	prettyprintln(Action),
+	trace.
+find_expected_effects_each(Action, Effects) :-
+	findall(E, 
+			(causal_law(Action, Conditions, E),
+			% Conditions is a list of fluent(), attr(), not(fluent()), not(attr())
+			conditions_currently_hold(Conditions)),
+		Effects).
+
+conditions_currently_hold([]).
+conditions_currently_hold([A|B]) :-
+	condition_holds(A),
+	conditions_currently_hold(B).
+
+% TODO clarify place of negated beliefs etc. If the -holds is on in the display section, negations will also be returned; need to take all factors into account.
+condition_holds(not(fluent(F))) :-
+	not(currently_holds(F)),
+	!.
+condition_holds(fluent(F)) :-
+	currently_holds(F),
+	!.
+% TODO ASP will not report static attributes, so for now I have a separate store which should also be turned into the ASP program's attributes.
+% These are obviously fixed, as outside the RRL part.
+condition_holds(not(attr(A))) :-
+	not(domain_attr(A)),
+	!.
+condition_holds(attr(A)) :-
+	domain_attr(A),
+	!.
 	
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
