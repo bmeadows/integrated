@@ -78,12 +78,33 @@ Plus goal, if it exists.
 ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed. But how to evaluate when goal is met, so remove?
 */
 readwrite_current_state_and_goal(File) :-
-
-	holds_at_zero(L) -> holds(L,0)
-	obs(X,Y,Z) -> obs(X,Y,Z)
-	hpd(Action, T) -> hpd(Action, T)
-	
+	add_holds_at_zero(File),
+	add_obs(File),
+	add_hpd(File),
 	direct_readwrite('current_state.txt', File).
+
+%holds_at_zero(L) -> holds(L,0)
+add_holds_at_zero(File) :-
+	findall(holds(L,0), holds_at_zero(L), List),
+	open(File, append, O),
+	nl(O),
+	writelneach(List, O),
+	close(O).
+%obs(X,Y,Z) -> obs(X,Y,Z)
+add_obs(File) :-
+	findall(obs(X,Y,Z), obs(X,Y,Z), List),
+	open(File, append, O),
+	nl(O),
+	writelneach(List, O),
+	close(O).
+%hpd(Action, T) -> hpd(Action, T)
+add_hpd(File) :-
+	findall(hpd(A,T), hpd(A,T), List),
+	open(File, append, O),
+	nl(O),
+	writelneach(List, O),
+	nl(O),
+	close(O).
 
 /*
 While static, these should be generated from a single central data store.
@@ -91,10 +112,21 @@ RRL purports to change statics, but consider that to be relabelling or interacti
 Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
 */
 readwrite_state_constraints_meta_and_statics(File) :-
-	direct_readwrite('state_constraints_meta_and_statics.txt', File)
-	domain_attr(A) -> A
+	direct_readwrite('state_constraints_meta_and_statics.txt', File),
+	add_domain_attributes(File).
 	
+add_domain_attributes(File) :-
+	findall(Att, domain_attr(Att), AttList),
+	open(File, append, O),
+	nl(O),
+	writelneach(AttList, O),
+	close(O).
 
+writelneach([A|B], O) :-
+	writeln(O, A),
+	writelneach(B, O).
+writelneach([], _).
+	
 /*
 Change this to include in the printed portion of the answer set
 - what occurs (for planning)

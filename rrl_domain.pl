@@ -1,5 +1,8 @@
 :- dynamic step/1.
-:- discontiguous actionDescription/4, impossible_if/2.
+:- discontiguous actionDescription/3, impossible_if/2, causal_law/3.
+
+% causal_law(Action, FluentsAndStaticsThatMustHold, Consequences).
+% Can have multiple causal laws per action
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -48,7 +51,7 @@ domain(sort(cabinet(cab2))).
 %
 domain(sort(Term1)) :- subsort(General,Specific), functor(Term1,General,1), arg(1,Term1,Arg), functor(Term2,Specific,1), arg(1,Term2,Arg), domain(sort(Term2)).
 
-% Current state (attributes)
+% = currentState(attr()) ? TODO resolve
 
 domain(attr(importance(p1,important))).
 domain(attr(importance(p2,important))).
@@ -348,11 +351,13 @@ applyActionToStateFinal(Something) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location], [QUESTIONMARK]).
+actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location]).
+causal_law(move(Robot, Destination), [], [fluent(loc(Robot, Destination))]).
 impossible_if(move(Robot, Destination), 10) :-
 	currentState(fluent(loc(Robot, Destination))).
 
-actionDescription(putdown(Robot, Object), [Robot, Object], [robot, item], [QUESTIONMARK]).
+actionDescription(putdown(Robot, Object), [Robot, Object], [robot, item]).
+causal_law(putdown(Robot, Object), [fluent(loc(Robot,L))], [not(fluent(in_hand(Robot, Object))), fluent(loc(Object, L))]).
 /*impossible_if(putdown(_Robot, Object), 20) :-
 	currentState(attr(surface(Object, brittle))). %%%%%%%%%%%%%%%%%%%%%%% !!! 1*/
 impossible_if(putdown(Robot, Object), 21) :-
@@ -364,7 +369,8 @@ actionDescription(wait(Robot), [Robot], [robot], []).
 
 % Check commenting for whether particular different axioms are targeted or known
 
-actionDescription(serve(Robot, Obj, Person), [Robot, Obj, Person], [robot, item, person], [QUESTIONMARK]).
+actionDescription(serve(Robot, Obj, Person), [Robot, Obj, Person], [robot, item, person]).
+causal_law(serve(Robot, Obj, Person), [], [fluent(in_hand(Person, Obj)), not(fluent(in_hand(Robot, Obj)))]).
 impossible_if(serve(Robot, _Obj, Person), 30) :-
 	not((	currentState(fluent(loc(Robot, Location))),
 			currentState(fluent(loc(Person, Location))) )).
@@ -375,11 +381,10 @@ impossible_if(serve(Robot, Obj, _Person), 32) :-
 	not(currentState(fluent(in_hand(Robot, Obj)))).
 impossible_if(serve(_Robot, _Obj, Person), 33) :-
 	currentState(fluent(in_hand(Person, _))).
-%impossible_if(serve(_Robot, Obj, Person), 34) :-
-	%( not(currentState(attr(role_type(Person, sales)))) ; currentState(fluent(labelled(Obj, true))) ). %%%%%%%%%%%%%%%%%%%%%%% !!! 3
-	%...What? This makes no sense, it's associated with a causal law (serving an unlabelled object to a salesperson makes it labelled), so it should always be valid
 	
-actionDescription(pickup(Robot, Object), [Robot, Object], [robot, item], [QUESTIONMARK]).
+	
+actionDescription(pickup(Robot, Object), [Robot, Object], [robot, item]).
+causal_law(pickup(Robot, Object), [fluent(loc(Robot,L))], [not(fluent(loc(Object, L))), fluent(in_hand(Robot, Object))]).
 impossible_if(pickup(Robot, Object), 40) :-
 	not((	currentState(fluent(loc(Robot, Loc))),
 			currentState(fluent(loc(Object, Loc))) )).
@@ -391,7 +396,8 @@ impossible_if(pickup(_Robot, Object), 42) :-
 impossible_if(pickup(Robot, _Object), 43) :-
 	currentState(fluent(in_hand(Robot, _))).
 
-actionDescription(affix_label(Robot, Object), [Robot, Object], [robot, item], [QUESTIONMARK]).
+actionDescription(affix_label(Robot, Object), [Robot, Object], [robot, item]).
+causal_law(affix_label(Robot, Object), [], [fluent(labelled(Object, true))]).
 impossible_if(affix_label(Robot, Object), 50) :-
 	not((	currentState(fluent(loc(Robot, Loc))),
 			currentState(fluent(loc(Object, Loc))) )).
@@ -586,10 +592,7 @@ change_att_value(Input, Return) :-
 	!.
 
 	
-
-
-
-% REMOVED CUP2
+	
 
 % Physical configurations:
 % Assuming furniture location is fixed...
@@ -691,28 +694,6 @@ domainAxiomClassifier([YesLiterals,NoLiterals], [YesLiterals,NoLiterals]) :- !.
 
 
 
-	
-/*
-
-CHANGES
-1. item_status is fluent
-2. no connected/disconnected printers
-3. manually redo the calculations
-4. check all the rules
-- domainAxiomClassifier x
-- validAction x
-- applyActionToStateFinal x
-- cached, below
-5. Go through and check the fluents are consistent in each of the unexpectedStateFluents lists.
-
-
-	
-	oh, they DO need to differ by what 'rule is eligible' axioms they have!
-	
-	test out with CACHED switched off
-	finally, when all running correctly, work out what all the CACHED info should be, and replace it 
-	finally finally, for convenience, make six versions all uncommented differently + talking about learning different types of axioms in 
-	*/
 
 
 
@@ -751,57 +732,4 @@ unexpectedStateFluents([loc(p1,library),loc(p2,workshop),loc(p3,office),loc(rob1
 	item_status(cup1,intact),item_status(book1,damaged),item_status(prin1,intact)
 	]). % An actual state from which unexpected outcomes occurred. Others are possible.
 executabilityConditionViolated(31).
-
-
-
-
-
-
-
-
-
-/*
-
-NOTES FROM SORTING OUT THE RELEVANCE SPACE
-
-(for #7, the positive affordance)
-
-First time:
-allValidTests [attr(arm_type(rob1,electromagnetic)),attr(arm_type(rob1,pneumatic)),attr(obj_weight(book1,heavy)),attr(obj_weight(book1,light)),attr(obj_weight(cup1,heavy)),attr(obj_weight(cup1,light)),attr(obj_weight(prin1,heavy)),attr(obj_weight(prin1,light)),attr(surface(book1,brittle)),attr(surface(book1,hard)),attr(surface(cup1,brittle)),attr(surface(cup1,hard)),attr(surface(prin1,brittle)),attr(surface(prin1,hard)),fluent(in_hand(rob1,book1)),fluent(in_hand(rob1,prin1)),fluent(item_status(cup1,intact)),fluent(labelled(cup1,false)),fluent(loc(cup1,kitchen)),fluent(loc(cup1,library)),fluent(loc(cup1,office)),fluent(loc(cup1,workshop)),fluent(loc(rob1,kitchen)),fluent(loc(rob1,library)),fluent(loc(rob1,office)),fluent(loc(rob1,workshop)),action(pickup(rob1,cup1)),action(pickup(rob1,book1)),action(pickup(rob1,prin1)),action(putdown(rob1,cup1)),action(putdown(rob1,book1)),action(putdown(rob1,prin1)),action(move(rob1,office)),action(move(rob1,workshop)),action(move(rob1,kitchen)),action(move(rob1,library)),action(affix_label(rob1,cup1)),action(affix_label(rob1,book1)),action(affix_label(rob1,prin1))]
-This is way more because it talks about properties of cup book and printer!
-Note that fluent(item_status(cup1,damaged)) doesn't appear at all, though!
-Nor is fluent(labelled(cup1,true))!!!!
-num_possible_attribute_configs(128)
-[action(pickup(rob1,cup1)),action(pickup(rob1,book1)),action(pickup(rob1,prin1)),action(putdown(rob1,cup1)),action(putdown(rob1,book1)),action(putdown(rob1,prin1)),action(move(rob1,office)),action(move(rob1,workshop)),action(move(rob1,kitchen)),action(move(rob1,library)),action(affix_label(rob1,cup1)),action(affix_label(rob1,book1)),action(affix_label(rob1,prin1))]
-Note this has pickup.putdown.label for the other two objects, too.
-
-Second time:
-allValidTests [attr(arm_type(rob1,electromagnetic)),attr(arm_type(rob1,pneumatic)),attr(obj_weight(cup1,heavy)),attr(obj_weight(cup1,light)),attr(surface(cup1,brittle)),attr(surface(cup1,hard)),action(pickup(rob1,cup1)),action(putdown(rob1,cup1)),action(affix_label(rob1,cup1))]
-What? No relevant fluents?? And no robot move action???
-num_possible_attribute_configs(8)
-[action(pickup(rob1,cup1)),action(putdown(rob1,cup1)),action(affix_label(rob1,cup1))]
-This doesn't have any travel!
-And 
-
-Could it be to do with the interplay between positive affordances and validAction?
-i.e. Requiring that actions be considered/attempted that seem unusable?
-
-
-		What are the criteria for winnowing down actions????
-		Check the PDF first
-		1. all the properties of the atoms named in the action
-		2. all the fluent relations they could appear in... including, for the serve action, loc(rob,everywhere) but not in_hand(rob,other_item)?? Because of execution conditions I guess?
-		3. actions are just 'those of the system description', i.e., nothing outside it
-		Then email as necessary
-		
-*/
-
-% CPU times
-% ???
-% ???
-
-%- Action 'affix_label(rob1, cup1)'
-%- Exception to executability condition "an object with a brittle surface cannot be labelled"
-%- Even when cup1 is brittle, under conditions [object is heavy, robot arm is electromagnetic], 'affix_label(rob1, cup1)' is possible
-
 
