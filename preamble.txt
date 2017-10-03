@@ -1,4 +1,4 @@
-
+#const numSteps = 5.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   sorts
@@ -31,4 +31,14 @@
 
 #boolean = {true, false}.
 #step = 0..numSteps.
+
+
+%% Fluents
+#inertial_fluent = loc(#thing, #location) + in_hand(#entity, #item) + item_status(#item, #status) + is_labelled(#item, #boolean).
+#fluent = #inertial_fluent.% + #defined_fluent.
+
+#action = move(#robot, #location) + pickup(#robot, #item) 
+	+ putdown(#robot, #item) + serve(#robot, #item, #person) + affix_label(#robot, #item) + wait(#robot).
+
+
 

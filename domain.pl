@@ -29,24 +29,24 @@ domain_attr(loc_type(rm2, office)).
 domain_attr(loc_type(rm3, office)).
 
 % Initial beliefs
-holds_at_zero(item_status(cup1, intact)).
-holds_at_zero(item_status(book1, intact)).
-holds_at_zero(item_status(prin1, damaged)).
-holds_at_zero(is_labelled(cup1, false)).
-holds_at_zero(is_labelled(book1, true)).
-holds_at_zero(is_labelled(prin1, false)).
-holds_at_zero(loc(cup1, rm1)).
-% holds_at_zero(loc(book1, rm0)). % Should be established by default?
-holds_at_zero(loc(prin1, rm0)).
-holds_at_zero(loc(tab1, rm1)).
-holds_at_zero(loc(shelf1, rm0)).
-holds_at_zero(loc(shelf2, rm3)).
-holds_at_zero(loc(desk1, rm2)).
-holds_at_zero(loc(rob1, rm1)).
-holds_at_zero(loc(p0, rm2)).
-holds_at_zero(loc(p1, rm0)).
-holds_at_zero(loc(p2, rm2)).
-holds_at_zero(loc(p3, rm3)).
+obs(item_status(cup1, intact),true,0).
+obs(item_status(book1, intact),true,0).
+obs(item_status(prin1, damaged),true,0).
+obs(is_labelled(cup1, false),true,0).
+obs(is_labelled(book1, true),true,0).
+obs(is_labelled(prin1, false),true,0).
+obs(loc(cup1, rm1),true,0).
+% obs(loc(book1, rm0),true,0). % Should be established by default?
+obs(loc(prin1, rm0),true,0).
+obs(loc(tab1, rm1),true,0).
+obs(loc(shelf1, rm0),true,0).
+obs(loc(shelf2, rm3),true,0).
+obs(loc(desk1, rm2),true,0).
+obs(loc(rob1, rm1),true,0).
+obs(loc(p0, rm2),true,0).
+obs(loc(p1, rm0),true,0).
+obs(loc(p2, rm2),true,0).
+obs(loc(p3, rm3),true,0).
 
 
 

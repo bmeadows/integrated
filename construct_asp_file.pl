@@ -21,10 +21,9 @@ construct_sp_file(File) :-
 	readwrite_preamble(File),
 	readwrite_actions(File),
 	readwrite_predicates(File),
-	readwrite_axioms(File),
-	readwrite_state_constraints_meta_and_statics(File),
-	readwrite_current_state_and_goal(File),
-	readwrite_display(File).
+	readwrite_axioms(File), % And meta
+	readwrite_current_state_and_goal(File).
+	%readwrite_display(File).
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %
  % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -42,6 +41,7 @@ readwrite_predicates(File) :-
 % The following parts are dynamic and will change
 
 readwrite_preamble(File) :-
+	/*
 	currentTime(CurrentTime),
 	number_of_ASP_steps_to_lookahead(N),
 	Steps is CurrentTime + N,
@@ -50,6 +50,7 @@ readwrite_preamble(File) :-
 	write(O, Steps),
 	write(O, "."),
 	close(O),
+	*/
 	direct_readwrite('preamble.txt', File).
 /* Deprecated
 	open(File, append, O2),
@@ -65,7 +66,7 @@ Use internal list of valid actions, which can be extended through learning.
 Also includes exoactions, which must be given dynamically.
 */
 readwrite_actions(File) :-
-	direct_readwrite('actions.txt', File),
+	%direct_readwrite('actions.txt', File),
 	writeExoActions(File).
 writeExoActions(File) :-
 	not(exoActionDescription(_,_,_,_)),
@@ -116,26 +117,42 @@ record_causal_laws(Head, [A|B]) :-
 	
 
 /*
-Use existing ASP file, and then add learned causal laws and executability conditions (stored in a form convenient for ASP).
+Axioms: Use existing ASP file, and then add learned causal laws and executability conditions (stored in a form convenient for ASP).
+*/
+/*
+Attributes: While static, these should be generated from a single central data store.
+RRL purports to change statics, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
+Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
 */
 readwrite_axioms(File) :-
-	direct_readwrite('axioms_causal.txt', File),
-	write_exogenous_c_laws(File),
-	direct_readwrite('axioms_exec.txt', File).
+	write_exogenous_causal_laws(File),
+	direct_readwrite('axioms.txt', File),
+	add_domain_attributes(File).
 
-write_exogenous_c_laws(File) :-
+write_exogenous_causal_laws(File) :-
 	open(File, append, O),
 	nl(O),
-	writeln(O, "% Exogenous actions : causal laws"),
+	writeln(O, "% Learned human actions : causal laws"),
 	write_cl_recs(O),
 	close(O).
 
+write_cl_recs(O) :-
+	cl_rec(not(Outcome), Head),
+	!,
+	retractall(cl_rec(not(Outcome), Head)),
+	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
+	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
+	write(O, "-"),
+	write(O, Clause),
+	writeln(O, "."),
+	write_cl_recs(O).
 write_cl_recs(O) :-
 	cl_rec(Outcome, Head),
 	retractall(cl_rec(Outcome, Head)),
 	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
 	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
-	writeln(O, Clause),
+	write(O, Clause),
+	writeln(O, "."),
 	write_cl_recs(O).
 write_cl_recs(_) :- !.
 
@@ -147,18 +164,18 @@ Plus goal, if it exists.
 ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed. But how to evaluate when goal is met, so remove?
 */
 readwrite_current_state_and_goal(File) :-
-	add_holds_at_zero(File),
+	%add_holds_at_zero(File),
 	add_obs(File),
 	add_hpd(File),
-	direct_readwrite('current_state.txt', File).
+	direct_readwrite('state_goal.txt', File).
 
 %holds_at_zero(L) -> holds(L,0)
-add_holds_at_zero(File) :-
+/*add_holds_at_zero(File) :-
 	findall(holds(L,0), holds_at_zero(L), List),
 	open(File, append, O),
 	nl(O),
 	writelneach(List, O),
-	close(O).
+	close(O).*/
 %obs(X,Y,Z) -> obs(X,Y,Z)
 add_obs(File) :-
 	findall(obs(X,Y,Z), obs(X,Y,Z), List),
@@ -175,14 +192,6 @@ add_hpd(File) :-
 	nl(O),
 	close(O).
 
-/*
-While static, these should be generated from a single central data store.
-RRL purports to change statics, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
-Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
-*/
-readwrite_state_constraints_meta_and_statics(File) :-
-	direct_readwrite('state_constraints_meta_and_statics.txt', File),
-	add_domain_attributes(File).
 	
 add_domain_attributes(File) :-
 	findall(Att, domain_attr(Att), AttList),
@@ -202,10 +211,10 @@ Change this to include in the printed portion of the answer set
 - what occurs (for planning)
 - what holds (including e.g. inertia)
 - what doesn't hold (including e.g. inertia)
-*/
+
 readwrite_display(File) :-
 	direct_readwrite('display.txt', File).
-
+*/
 
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %

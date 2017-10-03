@@ -51,3 +51,15 @@
 goal(I) :- holds(in_hand(P,book1),I), #person(P).
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+display
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+occurs.
+
+exogenous.
+
+-holds.
+holds.
+
+

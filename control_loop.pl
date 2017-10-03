@@ -7,7 +7,8 @@
 :- include(construct_asp_file).
 :- include(inputNLActionLearner). % exclude this to remove startup lag associated with wordnet
 
-:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, holds_at_zero/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1, obs/3, hpd/2, expected_effects/3, user_alerted_interruption/0.
+:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1, obs/3, hpd/2, expected_effects/3, user_alerted_interruption/0.
+%holds_at_zero/1
 
 inPlanMode(true).
 learningMode(off). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
@@ -19,8 +20,8 @@ test :-
 	compute_answer_sets.
 
 currentTime(0).
-currentTime_unaltered(5).
-number_of_ASP_steps_to_lookahead(5).
+currentTime_unaltered(5). % Not considering history resets
+%number_of_ASP_steps_to_lookahead(5).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -211,12 +212,12 @@ handle_answer_sets(List) :-
 	retractall(currently_holds(_)),
 	assertallcurrent(Current),
 	% 5. Get things that held at time zero
-	findall( Literal,
+	/*findall( Literal,
 			not(( member(SubList,List), not(member(holds(Literal,0),SubList)) )),
 			TimeZero),
 	% 6. Record what was believed at time zero
 	retractall(holds_at_zero(_)),
-	assertallzero(TimeZero),
+	assertallzero(TimeZero),*/
 	% 7. Get first found plan step and store it as next_plan_step(NPS); note handle_answer_sets is only called when 1 or more exists
 	% However, there might be no plan step because there is no goal
 	retractall(next_plan_step(_)),
@@ -236,10 +237,10 @@ reset_times :-
 	assert(currentTime(1)).
 	
 	
-assertallzero([]).
-assertallzero([A|B]) :-
-	assert(holds_at_zero(A)),
-	assertallzero(B).
+%assertallzero([]).
+%assertallzero([A|B]) :-
+	%assert(holds_at_zero(A)),
+	%assertallzero(B).
 
 assertallcurrent([]).
 assertallcurrent([A|B]) :-
