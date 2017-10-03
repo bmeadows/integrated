@@ -1,3 +1,6 @@
+
+:- dynamic cl_rec/2.
+
 /*
 Dynamic content:
 	holds_at_zero(L) -> holds(L,0)
@@ -59,21 +62,82 @@ readwrite_preamble(File) :-
 
 /*
 Use internal list of valid actions, which can be extended through learning.
-Also includes EXOACTIONS, which must be given dynamically.
+Also includes exoactions, which must be given dynamically.
 */
 readwrite_actions(File) :-
 	direct_readwrite('actions.txt', File),
+	writeExoActions(File).
+writeExoActions(File) :-
+	not(exoActionDescription(_,_,_,_)),
+	!,
 	open(File, append, O),
-	nl(O),
 	writeln(O, "#exoaction = unknown(#thing)."),
 	close(O).
+writeExoActions(File) :-
+	open(File, append, O),
+	write(O, "#exoaction = "),
+	findall([A,B,C,D], exoActionDescription(A,B,C,D), List),
+	write_each_exo(O, List),
+	writeln(O, "."),
+	nl(O), nl(O),
+	close(O).
+write_each_exo(O, [A,B|Tail]) :-
+	!,
+	write_exogenous_and_create_causal_laws(O, A),
+	write(O, " + "),
+	write_each_exo(O, [B|Tail]).
+write_each_exo(O, [A]) :-
+	write_exogenous_and_create_causal_laws(O, A).
+write_exogenous_and_create_causal_laws(O, Action) :-
+	Action = [Head, _Args, Sorts, Results],
+	functor(Head, Predicate, _NumArgs),
+	write(O, Predicate),
+	write(O, "("),
+	writeExoSorts(O, Sorts),
+	write(O, ")"),
+	record_causal_laws(Head, Results).
+	
+writeExoSorts(O, [A,B|Tail]) :-
+	!,
+	write(O, "#"),
+	write(O, A),
+	write(O, ", "),
+	writeExoSorts(O, [B|Tail]).
+writeExoSorts(O, [A]) :-
+	write(O, "#"),
+	write(O, A).
+	
+% Record exoactions' causal laws for later addition to ASP program
+record_causal_laws(_Head, []).
+record_causal_laws(Head, [A|B]) :-
+	assert(cl_rec(A, Head)),
+	record_causal_laws(Head, B).
+
 	
 
 /*
 Use existing ASP file, and then add learned causal laws and executability conditions (stored in a form convenient for ASP).
 */
 readwrite_axioms(File) :-
-	direct_readwrite('axioms.txt', File).
+	direct_readwrite('axioms_causal.txt', File),
+	write_exogenous_c_laws(File),
+	direct_readwrite('axioms_exec.txt', File).
+
+write_exogenous_c_laws(File) :-
+	open(File, append, O),
+	nl(O),
+	writeln(O, "% Exogenous actions : causal laws"),
+	write_cl_recs(O),
+	close(O).
+
+write_cl_recs(O) :-
+	cl_rec(Outcome, Head),
+	retractall(cl_rec(Outcome, Head)),
+	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
+	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
+	writeln(O, Clause),
+	write_cl_recs(O).
+write_cl_recs(_) :- !.
 
 /*
 List of what holds.
