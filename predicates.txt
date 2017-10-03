@@ -4,8 +4,9 @@
 
 loc_type(#location, #type).
 role_type(#person, #role).
-obj_status(#object, #status).
 obj_weight(#object, #weight).
+has_surface(#item, #item_surface).
+has_arm_type(#robot, #robot_arm_type).
 
 is_defined(#fluent).
 

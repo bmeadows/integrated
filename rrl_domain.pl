@@ -397,7 +397,7 @@ impossible_if(pickup(Robot, _Object), 43) :-
 	currentState(fluent(in_hand(Robot, _))).
 
 actionDescription(affix_label(Robot, Object), [Robot, Object], [robot, item]).
-causal_law(affix_label(Robot, Object), [], [fluent(labelled(Object, true))]).
+causal_law(affix_label(_Robot, Object), [], [fluent(labelled(Object, true))]).
 impossible_if(affix_label(Robot, Object), 50) :-
 	not((	currentState(fluent(loc(Robot, Loc))),
 			currentState(fluent(loc(Object, Loc))) )).

@@ -62,7 +62,12 @@ Use internal list of valid actions, which can be extended through learning.
 Also includes EXOACTIONS, which must be given dynamically.
 */
 readwrite_actions(File) :-
-	direct_readwrite('actions.txt', File).
+	direct_readwrite('actions.txt', File),
+	open(File, append, O),
+	nl(O),
+	writeln(O, "#exoaction = unknown(#thing)."),
+	close(O).
+	
 
 /*
 Use existing ASP file, and then add learned causal laws and executability conditions (stored in a form convenient for ASP).
@@ -123,7 +128,8 @@ add_domain_attributes(File) :-
 	close(O).
 
 writelneach([A|B], O) :-
-	writeln(O, A),
+	write(O, A),
+	writeln(O, "."),
 	writelneach(B, O).
 writelneach([], _).
 	

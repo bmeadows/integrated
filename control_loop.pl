@@ -6,7 +6,7 @@
 :- include(construct_asp_file).
 :- include(inputNLActionLearner). % exclude this to remove startup lag associated with wordnet
 
-:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1, obs/3, hpd/2, expected_effects/3.
+:- dynamic inPlanMode/1, learningMode/1, currently_holds/1, holds_at_zero/1, last_transitions_failed/1, currentTime/1, currentTime_unaltered/1, goal/1, obs/3, hpd/2, expected_effects/3, user_alerted_interruption/0.
 
 inPlanMode(true).
 learningMode(off). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
@@ -31,9 +31,47 @@ agent(rob1).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-domain_attr(obj_weight(text0, light)).
-domain_attr(obj_status(text0, good)).
-domain_attr(role_type(per0, engineer)).
+
+% Attributes
+domain_attr(role_type(p0,sales)).
+domain_attr(role_type(p1,sales)).
+domain_attr(role_type(p2,engineer)).
+domain_attr(role_type(p3,manager)).
+domain_attr(has_arm_type(rob1, electromagnetic)).
+domain_attr(obj_weight(cup1, light)).
+domain_attr(obj_weight(book1, light)).
+domain_attr(obj_weight(prin1, heavy)).
+domain_attr(obj_weight(tab1, heavy)).
+domain_attr(obj_weight(shelf1, light)).
+domain_attr(obj_weight(shelf2, light)).
+domain_attr(obj_weight(desk1, heavy)).
+domain_attr(has_surface(cup1, brittle)).
+domain_attr(has_surface(book1, brittle)).
+domain_attr(has_surface(prin1, brittle)).
+domain_attr(loc_type(rm0, library)).
+domain_attr(loc_type(rm1, workshop)).
+domain_attr(loc_type(rm2, office)).
+domain_attr(loc_type(rm3, office)).
+
+% Initial beliefs
+holds_at_zero(item_status(cup1, intact)).
+holds_at_zero(item_status(book1, intact)).
+holds_at_zero(item_status(prin1, damaged)).
+holds_at_zero(is_labelled(cup1, false)).
+holds_at_zero(is_labelled(book1, true)).
+holds_at_zero(is_labelled(prin1, false)).
+holds_at_zero(loc(cup1, rm1)).
+% holds_at_zero(loc(book1, rm0)). % Should be established by default?
+holds_at_zero(loc(prin1, rm0)).
+holds_at_zero(loc(tab1, rm1)).
+holds_at_zero(loc(shelf1, rm0)).
+holds_at_zero(loc(shelf2, rm3)).
+holds_at_zero(loc(desk1, rm2)).
+holds_at_zero(loc(rob1, rm1)).
+holds_at_zero(loc(p0, rm2)).
+holds_at_zero(loc(p1, rm0)).
+holds_at_zero(loc(p2, rm2)).
+holds_at_zero(loc(p3, rm3)).
 
 
 
@@ -62,13 +100,14 @@ get_observations :-
 	prettyprint('Time '),
 	prettyprint(T),
 	% Note that the last step's action and its effects will only be observed if default or next is chosen
-	prettyprintln('. Please give list of observations (or "d." for default or "n." for next from list): '),
+	prettyprintln('. Please give list of observations (or "d." for default or "i." for default+interruption or "n." for next from list): '),
 	read(Input),
 	prettyprintln(' '),
 	process_observations(Input).
 	
 process_observations(d) :- !, confirm_expected_effects.
 process_observations(n) :- !, confirm_expected_effects.
+process_observations(i) :- !, assert(user_alerted_interruption), confirm_expected_effects.
 process_observations([_A|_B]) :- !, prettyprintln('TODO!'), true.
 process_observations(_) :- get_observations.
 
@@ -171,11 +210,10 @@ all_achieved_goals([A|B]) :-
 	currently_holds(X),
 	all_achieved_goals(B).
 
-/*
-
-interrupted :- ?
-
-*/
+% TODO extend properly
+interrupted :-
+	user_alerted_interruption,
+	retractall(user_alerted_interruption).
 
 explained_all_transitions_last_step :-
 	last_transitions_failed(false).

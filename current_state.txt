@@ -1,12 +1,53 @@
 
+
+%obj_weight(text0, heavy).
+%loc_type(rm2, workshop).
+
+%obj_status(text0, good).
+%role_type(per0, engineer).
+
+
+
+
+%%%(1) "Serving an object to a salesperson causes it to be labelled." [causal law]
+%holds(is_labelled(X, true), I+1) :- occurs(serve(R,X,P),I), role_type(P,sales). 
+
+%%%(2) "Putting down an item with surface 'brittle' causes item to become 'damaged'." [causal law]
+%holds(item_status(X,damaged), I+1) :- occurs(putdown(R,X),I), has_surface(X,brittle).
+
+%%%(3) "Item cannot be served if damaged, except to an engineer." [executability condition]
+%-occurs(serve(R,X,P),I) :- holds(item_status(X,damaged),I), not role_type(P,engineer).
+
+%%%(4) "An item which does not have surface 'hard' cannot be labelled by a robot." [executability condition]
+%-occurs(affix_label(R,X),I) :- not has_surface(X,hard).
+
+%%%(5) "A robot with a electromagnetic arm can't pick up a heavy object."
+%-occurs(pickup(R,X),I) :- obj_weight(X,heavy) , has_arm_type(R,electromagnetic).
+
+%%%(6) "An item with item_status 'damaged' cannot be labelled by a robot with a pneumatic."
+%-occurs(affix_label(R,X),I) :- holds(item_status(X,damaged),I), has_arm_type(R,pneumatic).
+
+
+
+
 %holds(loc(rob0, rm1), 0).
 %holds(loc(text0, rm0), 0). 
 %holds(loc(per0, rm2), 0).
 
 
-%% Goal...
-%goal(I) :- holds(loc(text0, rm1), I), -holds(in_hand(rob0, text0), I).
-goal(I) :- holds(in_hand(per0, text0), I).
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Initial State
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Example history
+%obs(item_status(cup1, damaged), true, 2).
+
+
+%% Goal...
+%goal(I) :- holds(loc(book1, rm1), I), -holds(in_hand(rob1, book1), I).
+%goal(I) :- holds(in_hand(p0, book1), I).
+%goal(I) :- holds(in_hand(P,cup1),I), #person(P).
+goal(I) :- holds(in_hand(P,book1),I), #person(P).
 
 

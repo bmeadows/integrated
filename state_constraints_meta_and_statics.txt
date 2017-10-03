@@ -2,8 +2,14 @@
 %% State Constraints
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%% Any object exists in only one location...
--holds(loc(O, L2), I) :- holds(loc(O, L1), I), L1!=L2.
+%% An item can only have one status.
+-holds(item_status(X,S1), I) :- holds(item_status(X,S2),I), S1 != S2.
+
+%% An item is either labelled or not labelled. 
+-holds(is_labelled(X,B1),I) :- holds(is_labelled(X,B2),I), B1 != B2. 
+
+%% Any thing exists in only one location...
+-holds(loc(T, L2), I) :- holds(loc(T, L1), I), L1!=L2.
 
 %% If a robot is holding an object, they have the same location...
 holds(loc(O, L), I) :- holds(loc(R, L), I), holds(in_hand(R, O), I).
@@ -17,11 +23,12 @@ holds(loc(O, L), I) :- holds(loc(R, L), I), holds(in_hand(R, O), I).
 %% If thing is not at a location initially, assume not there ...
 -holds(loc(Th, L), 0) :- not holds(loc(Th, L),0), #thing(Th). 
 
-%% Location type, room type, status and weight have unique values...
--loc_type(L, T2) :- loc_type(L, T1), T1 != T2. 
+%% Attributes all have unique values...
+-loc_type(L, T2) :- loc_type(L, T1), T1 != T2.
 -role_type(P, RT2) :- role_type(P, RT1), RT1 != RT2.
--obj_status(O, S2) :- obj_status(O, S1), S1 != S2.
 -obj_weight(O, W2) :- obj_weight(O, W1), W1 != W2.
+-has_surface(X,S2) :- has_surface(X,S1), S1 != S2.
+-has_arm_type(R,T2) :- has_arm_type(R,T1), T1 != T2.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -45,6 +52,51 @@ holds(F,I+1) :- #inertial_fluent(F),
 
 %% CWA for defined fluents...
 %-holds(F, I) :- #defined_fluent(F), not holds(F, I). 
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%% Default and CR rules
+
+% Unclear if these actually work for e.g. multiple libraries or offices
+
+%% Books are usually in a library...
+holds(loc(B, L), 0) :- #book(B), loc_type(L, library), 
+			     not -holds(loc(B, L), 0).
+
+%% Books are otherwise in an office...
+holds(loc(B, LOff), 0) :- #book(B),
+					 loc_type(LLib, library), 
+					 loc_type(LOff, office), 
+		       	     -holds(loc(B, LLib), 0),
+ 		             not -holds(loc(B, LOff), 0).
+
+is_defined(loc(B, L)) :- #book(B), loc_type(L, library).
+
+%% Under exceptional circumstances, assume books are elsewhere...
+-holds(loc(B, L), 0) :+ #book(B), loc_type(L, library).
+-holds(loc(B, LOff), 0) :+ #book(B), loc_type(LOff, office), 
+			     loc_type(LLib, library), 
+			     -holds(loc(B, LLib), 0).
+
+				 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%% History and initial state rules
+
+%% Take what actually happened into account...
+occurs(A,I) :- hpd(A,I).
+
+%% Reality check axioms...
+:- obs(F, true, I), -holds(F, I).
+:- obs(F, false, I), holds(F, I).
+
+is_defined(F) :- obs(F, Y, 0).
+-holds(F, 0) :- #inertial_fluent(F),
+		not is_defined(F), not holds(F, 0).
+
+%% Awareness axiom...
+%holds(F, 0) | -holds(F, 0) :- #inertial_fluent(F).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -71,14 +123,7 @@ something_happened(I) :- occurs(A, I).
 %   not something_happened(J).
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Test
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%obj_weight(text0, heavy).
-%loc_type(rm2, workshop).
-
-%obj_status(text0, good).
-%role_type(per0, engineer).
-
-
