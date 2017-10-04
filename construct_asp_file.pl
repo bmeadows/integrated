@@ -70,6 +70,7 @@ readwrite_actions(File) :-
 	writeExoActions(File),
 	open(File, append, O),
 	writeln(O, "#action = #agentaction + #learned_exoaction."),
+	nl(O),
 	close(O).
 writeExoActions(File) :-
 	not(exoActionDescription(_,_,_,_)),
@@ -83,7 +84,7 @@ writeExoActions(File) :-
 	findall([A,B,C,D], exoActionDescription(A,B,C,D), List),
 	write_each_exo(O, List),
 	writeln(O, "."),
-	nl(O), nl(O),
+	nl(O),
 	close(O).
 write_each_exo(O, [A,B|Tail]) :-
 	!,
@@ -110,12 +111,49 @@ writeExoSorts(O, [A,B|Tail]) :-
 writeExoSorts(O, [A]) :-
 	write(O, "#"),
 	write(O, A).
-	
+
+
 % Record exoactions' causal laws for later addition to ASP program
-record_causal_laws(_Head, []).
-record_causal_laws(Head, [A|B]) :-
-	assert(cl_rec(A, Head)),
-	record_causal_laws(Head, B).
+record_causal_laws(Head, Results) :-
+	retractall(cl_rec(_, _)),
+	record_causal_laws_each(Head, Results),
+	cleanuptemp.
+	
+cleanuptemp :-
+	delete_file('temp.txt'), !.
+cleanuptemp.
+
+record_causal_laws_each(_Head, []).
+record_causal_laws_each(Head, [A|B]) :-
+	establish_causal_law_for_learned_action(Head, A, String),
+	assert(cl_rec(String)),
+	record_causal_laws_each(Head, B).
+
+establish_causal_law_for_learned_action(Head, not(Outcome), ReturnString) :-
+	!,
+	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
+	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
+	open('temp.txt', write, O),
+	write(O, Clause),
+	writeln(O, "."),
+	close(O),
+	read_file_to_string('temp.txt', String1, []),
+	split_string(String1, ":", "-", [StringHead, StringTail]),
+	string_concat(StringHead, " :- ", ST),
+	string_concat("-", ST, ST2), % Negated head. Add now to prevent "-" being removed in splitting
+	string_concat(ST2, StringTail, ReturnString).
+establish_causal_law_for_learned_action(Head, Outcome, ReturnString) :-
+	!,
+	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
+	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
+	open('temp.txt', write, O),
+	write(O, Clause),
+	writeln(O, "."),
+	close(O),
+	read_file_to_string('temp.txt', String1, []),
+	split_string(String1, ":", "-", [StringHead, StringTail]),
+	string_concat(StringHead, " :- ", ST),
+	string_concat(ST, StringTail, ReturnString).
 
 	
 
@@ -140,22 +178,10 @@ write_exogenous_causal_laws(File) :-
 	close(O).
 
 write_cl_recs(O) :-
-	cl_rec(not(Outcome), Head),
+	cl_rec(String),
 	!,
-	retractall(cl_rec(not(Outcome), Head)),
-	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
-	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
-	write(O, "-"),
-	write(O, Clause),
-	writeln(O, "."),
-	write_cl_recs(O).
-write_cl_recs(O) :-
-	cl_rec(Outcome, Head),
-	retractall(cl_rec(Outcome, Head)),
-	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
-	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
-	write(O, Clause),
-	writeln(O, "."),
+	retractall(cl_rec(String)),
+	write(O, String),
 	write_cl_recs(O).
 write_cl_recs(_) :- !.
 
@@ -170,6 +196,7 @@ readwrite_current_state_and_goal(File) :-
 	%add_holds_at_zero(File),
 	add_obs(File),
 	add_hpd(File),
+	add_goal(File),
 	direct_readwrite('state_goal.txt', File).
 
 %holds_at_zero(L) -> holds(L,0)
@@ -195,6 +222,13 @@ add_hpd(File) :-
 	nl(O),
 	close(O).
 
+add_goal(File) :-
+	open(File, append, O),
+	
+	writeln(O, "goal(I) :- holds(in_hand(P,book1),I), #person(P)."),
+	
+	nl(O),
+	close(O).
 	
 add_domain_attributes(File) :-
 	findall(Att, domain_attr(Att), AttList),

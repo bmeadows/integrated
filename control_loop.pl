@@ -90,7 +90,7 @@ expected_to_obs([not(fluent(A))|B],T) :-
 	
 interior_loop :-
 	inPlanMode(false),
-	interrupted, % New goal just assigned, or forced to plan.
+	interrupted, % New goal just assigned, or forced to plan. Assumption: The robot never has to abandon a goal in favour of another one, so this can only happen when not planning.
 	!,
 	retractall(inPlanMode(_)),
 	assert(inPlanMode(true)).

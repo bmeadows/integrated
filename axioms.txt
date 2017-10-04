@@ -89,15 +89,15 @@ holds(F,I+1) :- #inertial_fluent(F),
 -occurs(A,I) :- not occurs(A,I).
 
 %% CWA for exogenous actions...
--exogenous(E,I) :- not exogenous(E,I).
+%-exogenous(E,I) :- not exogenous(E,I).
 
 %% CWA for defined fluents...
 %-holds(F, I) :- #defined_fluent(F), not holds(F, I). 
 
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
 %% Default and CR rules
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Unclear if these actually work for e.g. multiple libraries or offices
 
@@ -123,8 +123,10 @@ is_defined(loc(B, L)) :- #book(B), loc_type(L, library).
 
 occurs(A, I) :+ #exoaction(A), I < numSteps.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% History and initial state rules
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% Take what actually happened into account...
 occurs(A,I) :- hpd(A,I).
@@ -139,7 +141,6 @@ is_defined(F) :- obs(F, Y, 0).
 
 %% Awareness axiom...
 %holds(F, 0) | -holds(F, 0) :- #inertial_fluent(F).
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -166,14 +167,6 @@ something_happened(I) :- occurs(A, I). % Note this includes exoactions as well a
 %   not something_happened(J).
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Test
+%% Test: Initial State
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Initial State
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-

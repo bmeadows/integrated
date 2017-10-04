@@ -1,5 +1,4 @@
-
-
+%goal(I) :- holds(loc(book1, rm1), I), -holds(in_hand(rob1, book1), I).
 
 
 %%%(1) "Serving an object to a salesperson causes it to be labelled." [causal law]
@@ -22,22 +21,12 @@
 
 
 
-
-%% Goal...
-%goal(I) :- holds(loc(book1, rm1), I), -holds(in_hand(rob1, book1), I).
-%goal(I) :- holds(in_hand(p0, book1), I).
-%goal(I) :- holds(in_hand(P,cup1),I), #person(P).
-goal(I) :- holds(in_hand(P,book1),I), #person(P).
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 display
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 occurs.
-
 exogenous.
-
 -holds.
 holds.
 
