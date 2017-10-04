@@ -67,16 +67,19 @@ Also includes exoactions, which must be given dynamically.
 */
 readwrite_actions(File) :-
 	%direct_readwrite('actions.txt', File),
-	writeExoActions(File).
+	writeExoActions(File),
+	open(File, append, O),
+	writeln(O, "#action = #agentaction + #learned_exoaction."),
+	close(O).
 writeExoActions(File) :-
 	not(exoActionDescription(_,_,_,_)),
 	!,
 	open(File, append, O),
-	writeln(O, "#exoaction = unknown(#thing)."),
+	writeln(O, "#learned_exoaction = unknown(#thing)."),
 	close(O).
 writeExoActions(File) :-
 	open(File, append, O),
-	write(O, "#exoaction = "),
+	write(O, "#learned_exoaction = "),
 	findall([A,B,C,D], exoActionDescription(A,B,C,D), List),
 	write_each_exo(O, List),
 	writeln(O, "."),

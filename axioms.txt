@@ -120,7 +120,9 @@ is_defined(loc(B, L)) :- #book(B), loc_type(L, library).
 			     loc_type(LLib, library), 
 			     -holds(loc(B, LLib), 0).
 
-				 
+
+occurs(A, I) :+ #exoaction(A), I < numSteps.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
 %% History and initial state rules
 
@@ -149,12 +151,12 @@ success :- goal(I).
 :- not success. 
 
 %% Cannot be idle while goal remains unachieved...
-occurs(A, I) | -occurs(A, I) :- not goal(I). 
+occurs(A, I) | -occurs(A, I) :- #agentaction(A), not goal(I). 
 
-%% Cannot execute two actions at the same time...
-:- occurs(A1,I), occurs(A2,I), A1 != A2.
+%% Cannot execute two agent actions at the same time...
+:- occurs(A1,I), occurs(A2,I), #agentaction(A1), #agentaction(A2), A1 != A2.
 
-something_happened(I) :- occurs(A, I).
+something_happened(I) :- occurs(A, I). % Note this includes exoactions as well as agentactions, i.e., an exoaction can replace an agentaction where necessary.
 
 :- not goal(I),
    not something_happened(I).
@@ -167,6 +169,11 @@ something_happened(I) :- occurs(A, I).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Test
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Initial State
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

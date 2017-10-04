@@ -1,12 +1,5 @@
 
 
-%obj_weight(text0, heavy).
-%loc_type(rm2, workshop).
-
-%obj_status(text0, good).
-%role_type(per0, engineer).
-
-
 
 
 %%%(1) "Serving an object to a salesperson causes it to be labelled." [causal law]
@@ -28,20 +21,6 @@
 %-occurs(affix_label(R,X),I) :- holds(item_status(X,damaged),I), has_arm_type(R,pneumatic).
 
 
-
-
-%holds(loc(rob0, rm1), 0).
-%holds(loc(text0, rm0), 0). 
-%holds(loc(per0, rm2), 0).
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Initial State
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Example history
-%obs(item_status(cup1, damaged), true, 2).
 
 
 %% Goal...
