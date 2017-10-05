@@ -224,12 +224,17 @@ add_hpd(File) :-
 
 add_goal(File) :-
 	open(File, append, O),
-	
-	writeln(O, "goal(I) :- holds(in_hand(P,book1),I), #person(P)."),
-	
+	currentGoal(Goal),
+	(atom(Goal)
+	->
+	atom_string(Goal,GoalString)
+	;
+	GoalString = Goal
+	),
+	writeln(O, GoalString),
 	nl(O),
 	close(O).
-	
+
 add_domain_attributes(File) :-
 	findall(Att, domain_attr(Att), AttList),
 	open(File, append, O),
