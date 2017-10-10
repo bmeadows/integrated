@@ -4,6 +4,7 @@
 
 :- include(domain).
 :- include(construct_asp_file).
+:- include(answer_set_cleaner).
 :- include(inputNLActionLearner). % exclude this to remove startup lag associated with wordnet
 
 :- dynamic inPlanMode/1, learningMode/1, last_transitions_failed/1, 
@@ -201,28 +202,8 @@ translate_answer_sets(File) :-
 	assert(last_transitions_failed(true)),
 	!.
 translate_answer_sets(File) :-
-
-
-	% 1. Get text
-	read_file_to_string(File, RawString, []),
-	% 2. Translate from ASP form to Prolog form
-	Separators = "\n",
-	Pads = "\s\t\n",
-	split_string(RawString, Separators, Pads, CurlyBracedSubStringList),
-	curlyBracedToPrologListAll(CurlyBracedSubStringList, SubLists),
-	
-	
-	
+	clean_answer_sets(File, SubLists), % answer_set_cleaner
 	handle_answer_sets(SubLists).
-
-curlyBracedToPrologListAll([], []).
-curlyBracedToPrologListAll([A|B], [HeadAtomicList|Tail]) :-
-	split_string(A, "{}", "", [_Firstbracket,P0,_Lastbracket]),
-	string_concat("[", P0, P1),
-	string_concat(P1, "]", P2),
-	atom_codes(P3, P2), % "string" to 'string'
-	atom_to_term(P3, HeadAtomicList, []),
-	curlyBracedToPrologListAll(B, Tail).
 
 handle_answer_sets(List) :-	
 	% Get what is in common for holds(H,T) at current time step T... because it may return a plan, there may be holds(H,T') for T' > T; ignore these

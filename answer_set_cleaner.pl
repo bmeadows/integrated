@@ -1,5 +1,5 @@
 
-test :- clean_answer_sets('answersetstest.txt', Return), print(Return), nl, nl.
+%test :- clean_answer_sets('answersetstest.txt', Return), print(Return), nl, nl.
 
 % Replaces answer sets. Replaces ASP style curly bracket sets with Prolog style sublists of list.
 clean_and_replace_answer_sets(File) :-
@@ -9,6 +9,7 @@ clean_and_replace_answer_sets(File) :-
 	nl(O),
 	close(O).
 
+% Succeeds on empty answer set but not on null answer set
 clean_answer_sets(File, Return) :-
 	% 1. Get text
 	read_file_to_string(File, RawString, []),
