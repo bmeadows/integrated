@@ -201,6 +201,8 @@ translate_answer_sets(File) :-
 	assert(last_transitions_failed(true)),
 	!.
 translate_answer_sets(File) :-
+
+
 	% 1. Get text
 	read_file_to_string(File, RawString, []),
 	% 2. Translate from ASP form to Prolog form
@@ -208,6 +210,9 @@ translate_answer_sets(File) :-
 	Pads = "\s\t\n",
 	split_string(RawString, Separators, Pads, CurlyBracedSubStringList),
 	curlyBracedToPrologListAll(CurlyBracedSubStringList, SubLists),
+	
+	
+	
 	handle_answer_sets(SubLists).
 
 curlyBracedToPrologListAll([], []).
