@@ -1,3 +1,6 @@
+% Created from lemma/e_lemma.txt using WordNet to reduce to verbs, then minimally manually edited
+% See lemma/e_lemma.txt for authorship information
+
 vb(abandon, [abandons, abandoning, abandoned]).
 vb(abase, [abases, abasing, abased]).
 vb(abate, [abates, abating, abated]).
