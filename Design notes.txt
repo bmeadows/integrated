@@ -1,142 +1,76 @@
-/*
-ASP is effectively the default store of agent beliefs; observations first go to it and what holds or does not hold in the answer set returned is used for any learning / other components.
-- Have to bear in mind '-holds' and 'not holds'
-- Because the learning and other modules never change beliefs directly, just pass ASP its previous answer set plus new observations
-- New observations may be of actions that were executed, too
-- At some point, reset time step to zero, and past observations and conclusions then hold at the new zero. Until then, continue adding observations relative to the current zero time step
+==========================
+Items completed:
+==========================
+1. Store predicates to add as content to the ASP program when it gets dynamically generated:
+	domain_attr(A) -> A
+	obs(X,Y,Z) -> obs(X,Y,Z) [including foundational beliefs at time zero]
+	hpd(Action, T) -> hpd(Action, T)
+2. ASP program receives the models of exogenous actions that the agent has learned, and generates preliminary causal laws for each of them.
+3. The control loop now polls the user each cycle for new observations, default observations, interruptions, etc.
+4. Moved some domain content to domain.pl so domains will be easier to load with the framework.
+5. Changed ASP program time steps to a fixed range in accordance with new design which resets history eagerly. Give observations at time zero, not beliefs.
+6. Set up #agentaction and #exoaction as subsorts of #action.
+7. Gave ASP ability to infer #exoaction as CR rule.
+8. ASP translation of learned causal laws for human exogenous actions now have correct spacing.
+9. When generating ASP program, now calls only four component files (plus dynamic content).
+10. ASP receives its goal dynamically, stored in the control loop.
+11. Ability for user to assign new goal to system, interrupting non-ASP effort (or replacing but not interrupting an existing goal being planned for).
+12. Clarified role of beliefs in control loop, used to predict effects of actions and return those effects as observations if the user/simulation agrees.
+13. Created a standalone script, answer_set_cleaner, that assigns plans costs equal to number of actions, reduces answer sets to minimal cost ones, and orders remaining sets for readability.
+14. Now call the answer set script in the control loop. The intersection of remaining sets is what is held true.
 
-Resetting history:
-- We have initial state defaults
-- These are retained for the new zero time step
-- However, conflicting evidence for them may exist; we don't want to revert; have to make sure initial state defaults hold only for things for which no contradictory belief exists
-- With new zero time step, know initially the counterevidence: easiest approach is to make all beliefs hold at time 0; could alternatively make them observed at time 1
-- Important not to erase history when in the middle of a particular planning task. Then it shouldn't interfere with noticing unexplained transitions and trying to learn from them
+==========================
+Current item:
+==========================
 
-Learning modules need to know what is believed. For the returned answer sets:
-1. Remove any duplicate answer sets (e.g. same elements presented in a different order)
-2. Elements in common across ALL remaining answer sets become the system's beliefs
-3. These beliefs will be returned to ASP, along with any new observations, when it is next called
-*/
-
-
-
-% Agent world model: The propositions the agent has about the world, including beliefs, goals and axioms. May be inaccurate or incomplete.
-% Agent simulation model: The propositions the agent has about an alternative, simulated world used for RRL (current assumption, otherwise we need to think about relabelling, a larger set of objects, etc).
-% Ground truth: The states of the world the agent is interacting with and the simulated one, including facts and axioms. Accurate and complete.
-
-
-
-% Category 1: Immutable, universal, and fully knowable terms available to the agent world model, agent simulation model, and ground truth.
-
-% Duplicated for the ASP and SWI-Prolog versions of the domain.
-
-subsort(Parent, Child). % Class hierarchy
-e.g. subsort(person, salesperson).
-
-ancestor(Ancestor, Descendant). % Derived class hierarchy term
-e.g. ancestor(entity, salesperson).
-
-sort(Term). % Predicate identifying facts about objects' class membership
-e.g. sort(salesperson(p1)).
-e.g. sort(status(damaged)).
-
-valid_attr(StaticPredicate, Sorts). % Defines valid construction of static attributes from sorts
-e.g. valid_attr(obj_status, [object,status]).
-
-valid_fluent(FluentPredicate, Sorts). % Defines valid construction of fluents from sorts
-e.g. valid_fluent(loc, [entity,location]).
-
-% Statics can readily be stored locally and passed to ASP whenever it's called.
-
-static_attr(Term). % States a static attribute-value pair which is true in the world and known to the agent
-e.g. static_attr(obj_status(cup1,damaged)).
+==========================
+Items remaining:
+==========================
+15. Produce a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
+16. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
+17. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
+18. Design and produce a full test domain, standardised across the four components.
+19. Implement ASP history resetting.
+- Turn everything that holds into observations at time step zero. They cannot remain beliefs, otherwise they will be lost when the answer set is calculated.
+- Using the reset conservatively would result in higher accuracy, since it may include restructuring of assumptions into initial facts.
+- As it is an approximation, to avoid over-constraining, do not give -holds beliefs as observations.
+- Taking the intersection of answer sets as we do gives a more justified set of beliefs to turn into ground facts, which should be sufficient for this work.
+- With number of time steps fixed in ASP program, it is necessary to always (eagerly) reset history.
+- Must also always reset after other interruptions, or if goal changes.
+- An area that will need special scrutiny is the time boundaries, e.g. n becoming 0. What of things that happened at time n-1 or n? How does it synchronise with polling the user/simulation for inputs?
+- It may be useful (if possible) to avoid anything happening on the reset time step or the one preceding, so that no external observations come in at the new zero time.
+- However, the demand for eager resets may make this restriction impossible.
+- Content from the answer set is stored in various ways in the control loop. All of these must be updated with new times, and possibly statuses.
+- Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
+- May be useful to keep a measure of 'true' time, tracked separately from the reset history.
+20. Integrate the RRL component into the main loop.
+21. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
 
 
 
-% Category 2: Stored timestamped observations, comprising logical literals and text descriptions. Translated into belief updates and learning opportunities by whichever component and then not considered again.
-
-holds(SingleFluentLiteral, Time). % Observation in ASP-readable form
-occurs(ActionLiteral, Time). % Occurrence (of the robot's own action) in ASP-readable form
-
-I have added a new predicate, exogenous(#exoaction,#step), to the ASP file.
-It is directly analogous to occurs(#action,#step) for actions other than those of the agent.
-Therefore, it lacks the constraints 'Cannot be idle while goal remains unachieved' and 'Cannot execute two actions at the same time'.
-We have initially #exoaction = unknown. When the system learns about action descriptions, it will add these as exoactions.
-It will also create ASP causal laws for exoactions from its internal SWI-Prolog format of them, which are updated by the learner with new observations.
-
-obs_ex_action("ActionDescription", LiteralEffectList, Time). % INPUT: Exogenous action with accompanying text description and literal effects
-exoActionDescription(Literal, ArgumentsList, SortsList, LiteralEffectList). % OUTPUT 1: Learned characterisation to be translated into ASP #exoaction
-exogenous(Exoaction, Time). % OUTPUT 2: Observed occurrence of instance of this new exoaction, ASP-readable as exogenous(#exoaction,#step)
 
 
+Axioms learned in other work:
 
-% Category 3: Structural knowledge / model axioms belonging to the agent
+%%%(1) "Serving an object to a salesperson causes it to be labelled." [causal law]
+%holds(is_labelled(X, true), I+1) :- occurs(serve(R,X,P),I), role_type(P,sales). 
 
-All learned axiom structures have to be translated into ASP anyway.
-Therefore, just store them in SWI-Prolog domain form and have a mechanism for translating them; do not store separately in ASP.
+%%%(2) "Putting down an item with surface 'brittle' causes item to become 'damaged'." [causal law]
+%holds(item_status(X,damaged), I+1) :- occurs(putdown(R,X),I), has_surface(X,brittle).
 
-impossible_if(Action, ID, [LIST OF CONDITIONS]) % Executability condition
-e.g. impossible_if(move(Robot, Destination), 10, [LIST OF CONDITIONS])
+%%%(3) "Item cannot be served if damaged, except to an engineer." [executability condition]
+%-occurs(serve(R,X,P),I) :- holds(item_status(X,damaged),I), not role_type(P,engineer).
 
-actionDescription(Literal, ArgumentsList, SortsList, LiteralEffectList) % Action descriptions / Causal laws
-e.g. actionDescription(putdown(Robot, Object), [Robot, Object], [robot, item], [LIST OF EFFECTS]) % Action descriptions / Causal laws
+%%%(4) "An item which does not have surface 'hard' cannot be labelled by a robot." [executability condition]
+%-occurs(affix_label(R,X),I) :- not has_surface(X,hard).
 
-- permitting_affordance(Act, correspondingexecutabilityconditionID, [LIST OF CONDITIONS]) % Positive affordance
+%%%(5) "A robot with a electromagnetic arm can't pick up a heavy object."
+%-occurs(pickup(R,X),I) :- obj_weight(X,heavy) , has_arm_type(R,electromagnetic).
 
-- % Negative affordance
-
-
-
-%* Establish ASP representation for affordances
-%* Establish SWI representation for affordances
-%* As per discussions, need to ensure each affordance gets a name, even if temporarily assigned... we could do something interactive, with wordnet/NL/etc
-%* Return to question of automatically determining which type of axiom to learn
+%%%(6) "An item with item_status 'damaged' cannot be labelled by a robot with a pneumatic."
+%-occurs(affix_label(R,X),I) :- holds(item_status(X,damaged),I), has_arm_type(R,pneumatic).
 
 
-
-(Exogenous) action learning:
-1. Get list of observations from the time the external action was also observed
-2. Tag text, and translate through wordnet and with reference to known statics
-3. Construct and store new knowledge structure in agent model
-
-
-
-Simulation: world model
-- All currently true fluents
-- All rules for conditional effects of attempting actions in the world
-- Does not need to repeat e.g. static attributes
-
-6. Simulation: RRL model
-- All fluents currently holding FOR RRL
-- All static attributes currently holding FOR RRL
-- Can use rules from (5)
-
-Agent's world model... comes from ASP answer sets as a list of occurs/holds/exogenous literals; retain only the holds(X,currentStep) for agent beliefs, but the entire list will be sent back to ASP
-
-
-Agent's RRL model
-currentState(attr(X))
-currentState(fluent(Y))
-
-Ground truth RRL model... probably does not need to exist, because the system is essentially polling it about what happens for a transition from a given state
-However, for the ground truth world, no omniscience. e.g., things are only relevant if you can perceive what state they are in.
-Need a way to go from autodetected relevance to set of 'relevant' tests that can be used in the BDT, instead of specifying it.
-
-
-
-Other domain information currently used in RRL:
-- domain_specified_end
-- stateConstraintsViolated
-- valid(action(pickup(R,O))) :- clause
-- domain_test_alternatives not needed?
-- defaultNullAction (List)
-- applyActionToStateFinal(serve(R, Obj, P)) i.e. the ground truth rules, whether RRL simulation or real world simulation
-
-
-Assume an interactive mode: each time step, inform the system either
-a) It observes what it expects to observe (e.g. what the simulation says is the result of an action), with key '.', or
-b) Expected updates plus the next observation from a given list of them, e.g. textual action descriptions, with key ',', or
-c) Expected updates plus new observations, written in Prolog list form, e.g. [occurs(x,20),holds(y,20)]
 
 
 
