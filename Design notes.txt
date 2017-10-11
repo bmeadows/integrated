@@ -22,29 +22,34 @@ Items completed:
 ==========================
 Current item:
 ==========================
+15. Change so that control loop asks for observations in a way depending on current mode, e.g., the current version for planning, but differently for verbal-cued action learning.
 
 ==========================
 Items remaining:
 ==========================
-15. Produce a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
-16. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
-17. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
-18. Design and produce a full test domain, standardised across the four components.
-19. Implement ASP history resetting.
+16. Return to question of automatically determining which type of axiom to learn. Is it open?
+17. Produce a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
+18. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
+19. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
+20. Design and produce a full test domain, standardised across the four components.
+21. Implement ASP history resetting.
 - Turn everything that holds into observations at time step zero. They cannot remain beliefs, otherwise they will be lost when the answer set is calculated.
 - Using the reset conservatively would result in higher accuracy, since it may include restructuring of assumptions into initial facts.
 - As it is an approximation, to avoid over-constraining, do not give -holds beliefs as observations.
-- Taking the intersection of answer sets as we do gives a more justified set of beliefs to turn into ground facts, which should be sufficient for this work.
+- As it stands, observed negations (leading to negated beliefs) will be lost. Perhaps we could extend the method so that for any -holds(X,n), if there was a obs(X,false,i<n), add obs(X,false,0) in the new history.
+- Taking the intersection of answer sets as we do gives a more justified set of beliefs to turn into ground facts.
+- Initial state defaults will hold at the new step zero for anything not contradicted by observed evidence.
 - With number of time steps fixed in ASP program, it is necessary to always (eagerly) reset history.
 - Must also always reset after other interruptions, or if goal changes.
 - An area that will need special scrutiny is the time boundaries, e.g. n becoming 0. What of things that happened at time n-1 or n? How does it synchronise with polling the user/simulation for inputs?
+- As long as history is not reset while planning task is underway, there should be no interference btween the reset and the process of noticing and learning from unexplained transitions.
 - It may be useful (if possible) to avoid anything happening on the reset time step or the one preceding, so that no external observations come in at the new zero time.
 - However, the demand for eager resets may make this restriction impossible.
 - Content from the answer set is stored in various ways in the control loop. All of these must be updated with new times, and possibly statuses.
 - Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
 - May be useful to keep a measure of 'true' time, tracked separately from the reset history.
-20. Integrate the RRL component into the main loop.
-21. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
+22. Integrate the RRL component into the main loop.
+23. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
 
 
 
@@ -73,4 +78,31 @@ Axioms learned in other work:
 
 
 
+
+Notes
+1. ASP is effectively the default store of agent beliefs; observations first go to it and the answer set returns beliefs (amongst other things) used by the other modules.
+2. Components must include	agent world model (propositions the agent has about the world, possibly inaccurate or incomplete);
+							agent simulation model (propositions the agent has about an alternative, simulated world used for RRL -- we are not relabelling real world objects in this work);
+							ground truth (accurate and complete states of the world the agent is interacting with, be it real, simulated, simulated for RRL, given by user, etc)
+3. Universal: sorts, subsorts, ancestors, valid static attributes, valid fluents.
+4. Near-universal: static attributes for the environment and for simulation RRL.
+5. At the end of each active (motivated) verbal action learning episode, need to call ASP. The program will include the new (or revised) axiom.
+History will be reset to the time before the observation, and ASP will make it consistent with other beliefs using the new knowledge.
+Doing it a different way, e.g. manually checking for contradictions between beliefs of last answer set and observations associated with demonstrated action, would be difficult for nuanced inconsistencies.
+6. Positive affordance: permitting_affordance(ActionLiteral, Corresponding_executability_condition_ID, [List, of, conditions...])
+7. Negative affordance: ?
+8. Each affordance should receive a name, even if temporarily assigned upon discovery. A human user could be asked to name it. Something deeper using e.g. Wordnet or POS tagging might be possible.
+9. Agent RRL model: currentState(attr(X)), currentState(fluent(Y)), etc.
+10. Other domain information currently used in RRL:
+- domain_specified_end
+- stateConstraintsViolated
+- valid(action(pickup(R,O))) :- clause
+- domain_test_alternatives %% May be deprecated and not in use
+- defaultNullAction (List)
+- applyActionToStateFinal(serve(R, Obj, P)) i.e. the ground truth rules
+11. Questions remaining about RRL simulation. Does ground truth need to exist or is the agent's belief about the state correct by definition, in which case it can apply ground truth transitions to agent's beliefs?
+Obviously those transitions can differ from axioms in agent model, which the agent is trying to refine.
+How does relevance now work? If the robot is non-omniscient, there is an idea that everything whose state can be observed is relevant. But this may be a different sense of the term.
+In particular, for RRL, is relevance still constructed and provided, so that the BDT is restricted to 'relevant' tests?
+Is relevance used outside of RRL?
 
