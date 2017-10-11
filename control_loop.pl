@@ -27,8 +27,6 @@ currentTime(0).
 currentTime_unaltered(5). % Not considering history resets
 %number_of_ASP_steps_to_lookahead(5).
 
-currentGoal("goal(I) :- holds(in_hand(P,book1),I), #person(P).").
-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%% Section 2: Main %%%%%%%%%%%%%%%%%%
@@ -160,8 +158,15 @@ execute_plan :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 exists_unachieved_goal :-
-	not(( answer_set_goal(I),
+	not(( answer_set_goal(I), % answer_set_goal(I) only encodes that the last answer sets agree the goal is (was, will be) fulfilled at time step I
 	currentTime(I) )).
+	% e.g.1 Current time is 2. Answer set describes plan steps at times 0, 1, 2 such that goal is met at time 3. This includes observations of actions at times 0, 1, so it does not re-plan these.
+	% So answer set includes {goal(3), goal(4), ...}. So goal is not achieved, so exists_unachieved_goal is true.
+	% e.g.2 Current time is 3. Answer set describes plan steps at times 0, 1, 2 such that goal is met at time 3. This includes observations of actions at times 0, 1, 2, so it does not re-plan these.
+	% So answer set includes {goal(3), goal(4), ...}. So goal is achieved, so exists_unachieved_goal is false.
+	
+	% Note this check only makes sense when in planning mode. e.g. Exoactions are learned actively, and occur on time steps, and ASP is called after each case to maintain consistency.
+	
 
 /*
 exists_unachieved_goal :-
@@ -318,14 +323,14 @@ condition_believed(attr(A)) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 request_verbal_cue :- 
-	prettyprint('Requesting verbal cue (or "n"	for no):   '),
+	prettyprint('Requesting verbal cue (or "c"	to cancel and try exploratory RRL instead):   '),
 	read(Input),
 	prettyprintln(' '),
 	check_verbal_cue(Input).
 
-check_verbal_cue('n') :-
+check_verbal_cue('c') :-
 	!,
-	fail.
+	fail. % In this case, should backtrack to retry the next clause of the interior_loop s.t. learningMode(activeExplorationRRLOrActionLearning).
 check_verbal_cue([A,B,C]) :-
 	!,
 	assert(obs_ex_action(A,B,C)).

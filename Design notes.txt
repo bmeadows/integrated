@@ -18,21 +18,24 @@ Items completed:
 12. Clarified role of beliefs in control loop, used to predict effects of actions and return those effects as observations if the user/simulation agrees.
 13. Created a standalone script, answer_set_cleaner, that assigns plans costs equal to number of actions, reduces answer sets to minimal cost ones, and orders remaining sets for readability.
 14. Now call the answer set script in the control loop. The intersection of remaining sets is what is held true.
+15. Changed so that exoactions replace the need for an agent action to occur on each time step (to account for how active learning followed by consistency checking will work).
 
 ==========================
 Current item:
 ==========================
-15. Change so that control loop asks for observations in a way depending on current mode, e.g., the current version for planning, but differently for verbal-cued action learning.
+16. Ensure there can be no problems with no observation of an action being given at a time step that has passed, so that ASP inappropriately re-plans it.
+17. Finally in perform_active_action_learning, add observations about the exoaction occurring for ASP, and then call ASP. Also place some hooks for history resets, e.g. after each such episode.
+	(It might be better to only reset after all active action learning has finished, but this has risks e.g. more actions were learned than there are time steps by default in the ASP program.)
 
 ==========================
 Items remaining:
 ==========================
-16. Return to question of automatically determining which type of axiom to learn. Is it open?
-17. Produce a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
-18. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
-19. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
-20. Design and produce a full test domain, standardised across the four components.
-21. Implement ASP history resetting.
+18. Return to question of automatically determining which type of axiom to learn. Is it open?
+19. Produce a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
+20. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
+21. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
+22. Design and produce a full test domain, standardised across the four components.
+23. Implement ASP history resetting.
 - Turn everything that holds into observations at time step zero. They cannot remain beliefs, otherwise they will be lost when the answer set is calculated.
 - Using the reset conservatively would result in higher accuracy, since it may include restructuring of assumptions into initial facts.
 - As it is an approximation, to avoid over-constraining, do not give -holds beliefs as observations.
@@ -48,8 +51,8 @@ Items remaining:
 - Content from the answer set is stored in various ways in the control loop. All of these must be updated with new times, and possibly statuses.
 - Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
 - May be useful to keep a measure of 'true' time, tracked separately from the reset history.
-22. Integrate the RRL component into the main loop.
-23. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
+24. Integrate the RRL component into the main loop.
+25. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
 
 
 

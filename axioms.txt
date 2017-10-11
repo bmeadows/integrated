@@ -154,8 +154,11 @@ success :- goal(I).
 %% Cannot be idle while goal remains unachieved...
 occurs(A, I) | -occurs(A, I) :- #agentaction(A), not goal(I). 
 
-%% Cannot execute two agent actions at the same time...
-:- occurs(A1,I), occurs(A2,I), #agentaction(A1), #agentaction(A2), A1 != A2.
+%% Cannot execute two actions at the same time...
+%% Note this includes exoactions as well as agentactions, because exoactions are learned actively, so no planning/execution should be taking place at the same time.
+%% Else
+%% :- occurs(A1,I), occurs(A2,I), #agentaction(A1), #agentaction(A2), A1 != A2.
+:- occurs(A1,I), occurs(A2,I), #action(A1), #action(A2), A1 != A2.
 
 something_happened(I) :- occurs(A, I). % Note this includes exoactions as well as agentactions, i.e., an exoaction can replace an agentaction where necessary.
 

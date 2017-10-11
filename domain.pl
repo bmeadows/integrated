@@ -3,7 +3,9 @@
 %%%%%%%%%%%%%%% Domain (control loop) %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-goal(I, [holds(in_hand(per0, text0), I)]).
+% Deprecated? goal(I, [holds(in_hand(per0, text0), I)]).
+
+currentGoal("goal(I) :- holds(in_hand(P,book1),I), #person(P).").
 
 agent(rob1).
 
