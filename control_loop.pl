@@ -54,16 +54,19 @@ get_observations :-
 	currentTime(T),
 	prettyprint('Time '),
 	prettyprint(T),
+	currentTime_unaltered(TU),
+	prettyprint('['),
+	prettyprint(TU),
 	% Note that the last step's action and its effects will only be observed if default or next is chosen
-	prettyprintln('. Please give Prolog list of observations (or string encoding goal, or "d." for default, or "i." for default+interruption, or "n." for next from list): '),
+	prettyprintln(']. Please give Prolog list of observations (or string encoding goal, or "d." for default, or "i." for default+interruption, or "n." for next from list): '),
 	read(Input),
 	prettyprintln(' '),
 	process_observations(Input).
 	
 process_observations(d) :- !, confirm_expected_effects.
-process_observations(n) :- !, confirm_expected_effects.
+process_observations(n) :- !, prettyprintln('TODO: List input!'), trace.
 process_observations(i) :- !, assert(user_alerted_interruption), confirm_expected_effects.
-process_observations([_A|_B]) :- !, prettyprintln('TODO!'), true.
+process_observations([_A|_B]) :- !, prettyprintln('TODO: Observation list!'), trace.
 process_observations(X) :- string(X), assert(user_alerted_interruption), currentGoal(Current), prettyprint('Removing goal:  '), prettyprintln(Current), retractall(currentGoal(_)), assert(currentGoal(X)), prettyprint('Adding goal:    '), prettyprintln(X), !.
 process_observations(X) :- atom(X),   assert(user_alerted_interruption), currentGoal(Current), prettyprint('Removing goal:  '), prettyprintln(Current), retractall(currentGoal(_)), assert(currentGoal(X)), prettyprint('Adding goal:    '), prettyprintln(X), !.
 process_observations(_) :- get_observations.
