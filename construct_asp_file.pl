@@ -217,7 +217,7 @@ add_obs(File) :-
 	writelneach(List, O),
 	close(O).
 %hpd(Action, T) -> hpd(Action, T)
-add_hpd(File) :-
+add_hpd(File) :- % Includes exoactions
 	findall(hpd(A,T), hpd(A,T), List),
 	open(File, append, O),
 	nl(O),

@@ -12,7 +12,7 @@
 %exoActionDescription(file_alternative(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,F)),in(F,C),open(C,false)]).
 %exoActionDescription(file(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,C))]).
 
-exoActionDescription(humanget(P, I), [P, I], [person, item], [in_hand(P,I)]).
+exoActionDescription(example_pickup(P, I), [P, I], [person, item], [in_hand(P,I)]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -102,7 +102,8 @@ learnFromActionDescs([A|B]) :-
 		% Lift structure
 		(lift(GroundedActionDescription, LiftedActionDescription), assert(LiftedActionDescription))
 	),
-	assert(exogenous(observed_occurrence_of_instance,something)),
+	currentTime(T),
+	assert(hpd(Head,T)),
 	!,
 	learnFromActionDescs(B).
 learnFromActionDescs([A|B]) :-
@@ -375,10 +376,11 @@ translateAdjThroughWordNet(InitialValue,FinalValue) :- % Similar adjectival sens
 	(Type2 = s ; Type2 = a),
 	InitialValue \= FinalValue.
 
+translateLearnedActionDescsToPrologRules :- !. % TODO
 translateLearnedActionDescsToPrologRules :-
        tell('learned_action_descs.pl'),
        listing(exoActionDescription/4),
-       told,
-       tell('exogenous_events.pl'),
-       listing(exogenous/2),
        told.
+       %tell('exogenous_events.pl'),
+       %listing(hpd/2),
+       %told.
