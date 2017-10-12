@@ -1,5 +1,3 @@
-%goal(I) :- holds(loc(book1, rm1), I), -holds(in_hand(rob1, book1), I).
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -7,8 +5,7 @@ display
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 occurs.
-exogenous.
--holds.
 holds.
+-holds.
 goal.
 

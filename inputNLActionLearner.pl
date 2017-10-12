@@ -1,16 +1,18 @@
 :- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1.
 
+% Includes
 :- include('wordnet/wn_s.pl').
 :- include('wordnet/wn_sim.pl').
-:- include(verbs).
-:- include(rrl_domain).
+:- [verbs,rrl_domain,pretty_printer].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Examples of 'learnable' action descriptions already known, to demonstrate generalisation
-exoActionDescription(file(P, F, C), [P, F, C], [manager, book, furniture], [not(in_hand(P,F)),in(F,C),open(C,false)]).
-exoActionDescription(file_alternative(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,F)),in(F,C),open(C,false)]).
-exoActionDescription(file(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,C))]).
+%exoActionDescription(file(P, F, C), [P, F, C], [manager, book, furniture], [not(in_hand(P,F)),in(F,C),open(C,false)]).
+%exoActionDescription(file_alternative(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,F)),in(F,C),open(C,false)]).
+%exoActionDescription(file(P, F, C), [P, F, C], [salesperson, item, cabinet], [not(in_hand(P,C))]).
+
+exoActionDescription(humanget(P, I), [P, I], [person, item], [in_hand(P,I)]).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -48,13 +50,6 @@ exoActionDescription(polish(_8584,_8586),[_8584,_8586],[engineer,table],[reflect
 exoActionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cup,book],[not(in_hand(_9442,_9444)),loc(_9444,_9446)])
 
 */
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-prettyprintln(String) :- prettyprint(String), nl.
-prettyprint(String) :- atom(String), writef(String), !.
-prettyprint(Term) :- write(Term).
-prettyprintstars :- prettyprintln('************************').
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

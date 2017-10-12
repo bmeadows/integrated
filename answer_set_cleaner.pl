@@ -1,16 +1,19 @@
 
-%test :- clean_answer_sets('answersetstest.txt', Return), print(Return), nl, nl.
+% Includes
+:- [pretty_printer].
+
+%test :- clean_answer_sets('answersetstest.txt', Return, false), print(Return), nl, nl.
 
 % Replaces answer sets. Replaces ASP style curly bracket sets with Prolog style sublists of list.
 clean_and_replace_answer_sets(File) :-
-	clean_answer_sets(File, Return),
+	clean_answer_sets(File, Return, false),
 	open(File, write, O),
 	writeln(O, Return),
 	nl(O),
 	close(O).
 
 % Succeeds on empty answer set but not on null answer set
-clean_answer_sets(File, Return) :-
+clean_answer_sets(File, Return, PrintToFile) :-
 	% 1. Get text
 	read_file_to_string(File, RawString, []),
 	% 2. Translate from ASP form to Prolog form
@@ -20,7 +23,8 @@ clean_answer_sets(File, Return) :-
 	curlyBracedToPrologListAll(CurlyBracedSubStringList, SubLists),
 	pairWithValues(SubLists, SubListsPaired),
 	reduceToMinimal(SubListsPaired, MinimalSubLists),
-	orderCorrectly(MinimalSubLists, Return).
+	orderCorrectly(MinimalSubLists, Return),
+	printSets(PrintToFile, Return).
 
 curlyBracedToPrologListAll([], []).
 curlyBracedToPrologListAll([A|B], [HeadAtomicList|Tail]) :-
@@ -31,6 +35,23 @@ curlyBracedToPrologListAll([A|B], [HeadAtomicList|Tail]) :-
 	atom_to_term(P3, HeadAtomicList, []),
 	curlyBracedToPrologListAll(B, Tail).
 	
+printSets(false, Content) :-
+	prettyprint('Answer sets cleaned. '),
+	length(Content,Num), prettyprint(Num),
+	prettyprintln(' set(s) remaining.').
+printSets(true, Content) :-
+	open('a_s.txt', write, O),
+	printEachSet(O,Content),
+	close(O),
+	prettyprint('Answer sets cleaned. '),
+	length(Content,Num), prettyprint(Num),
+	prettyprintln(' set(s) remaining. Written out to a_s.txt').
+printEachSet(_,[]).
+printEachSet(O,[A|B]) :-
+	writeln(O, A),
+	nl(O),
+	printEachSet(O,B).
+
 %%%%%%%%%%%%%%%%%%%%%%
 
 % Assign plans costs equal to number of actions

@@ -2,10 +2,9 @@
 %%%%%%%%%%%%%%% Section 1: Parameters %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-:- include(domain).
-:- include(construct_asp_file).
-:- include(answer_set_cleaner).
-:- include(inputNLActionLearner). % exclude this to remove startup lag associated with wordnet
+% Includes
+:- [domain,construct_asp_file,answer_set_cleaner,pretty_printer].
+:- [inputNLActionLearner]. % Exclude this to remove startup lag associated with WordNet
 
 :- dynamic inPlanMode/1, learningMode/1, last_transitions_failed/1, 
 currently_believed_to_hold/1, currentTime/1, currentTime_unaltered/1, currentGoal/1, 
@@ -210,7 +209,7 @@ translate_answer_sets(File) :-
 	assert(last_transitions_failed(true)),
 	!.
 translate_answer_sets(File) :-
-	clean_answer_sets(File, SubLists), % answer_set_cleaner
+	clean_answer_sets(File, SubLists, true), % answer_set_cleaner
 	handle_answer_sets(SubLists).
 
 handle_answer_sets(List) :-	

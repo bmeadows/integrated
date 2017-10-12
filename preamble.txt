@@ -4,28 +4,17 @@
   sorts
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-#location = [rm][0..3].
+#location = {rmwor, rmoff, rmlib}.
 
 #robot = {rob1}.
-#person = [p][0..3].
+#person = {p0}. 
 #entity = #robot + #person.	
 
 #type = {office, library, workshop}.
-#role = {engineer, sales, manager}.
-#status = {damaged, intact}.
-#weight = {light, heavy}.
-#item_surface = {hard, brittle}.
-#robot_arm_type = {pneumatic, electromagnetic}.
 
-#cup = {cup1}.
 #book = {book1}.
-#printer = {prin1}.
-#item = #cup + #book + #printer.
-#shelf = {shelf1, shelf2}.
-#desk = {desk1}.
-#table = {tab1}.
-#furniture = #shelf + #desk + #table.
-#object = #item + #furniture.
+#item = #book.
+#object = #item.
 
 #thing = #object + #entity.
 
@@ -34,9 +23,8 @@
 
 
 %% Fluents
-#inertial_fluent = loc(#thing, #location) + in_hand(#entity, #item) + item_status(#item, #status) + is_labelled(#item, #boolean).
-#fluent = #inertial_fluent.% + #defined_fluent.
+#inertial_fluent = loc(#thing, #location) + in_hand(#entity, #item).
+#fluent = #inertial_fluent.
 
 #agentaction = move(#robot, #location) + pickup(#robot, #item) 
-	+ putdown(#robot, #item) + serve(#robot, #item, #person) + affix_label(#robot, #item).
-
+	+ putdown(#robot, #item) + serve(#robot, #item, #person).

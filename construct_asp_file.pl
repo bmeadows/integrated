@@ -1,4 +1,7 @@
 
+% Includes
+:- [pretty_printer].
+
 :- dynamic cl_rec/2.
 
 /*
@@ -197,7 +200,7 @@ readwrite_current_state_and_goal(File) :-
 	add_obs(File),
 	add_hpd(File),
 	add_goal(File),
-	direct_readwrite('state_goal.txt', File).
+	direct_readwrite('state_goal_display.txt', File).
 
 %holds_at_zero(L) -> holds(L,0)
 /*add_holds_at_zero(File) :-

@@ -1,20 +1,16 @@
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   predicates
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 loc_type(#location, #type).
-role_type(#person, #role).
-obj_weight(#object, #weight).
-has_surface(#item, #item_surface).
-has_arm_type(#robot, #robot_arm_type).
 
 is_defined(#fluent).
 
 % Beliefs
 holds(#fluent,#step). % Belief
 occurs(#action,#step). % Plan generation
-%exogenous(#exoaction,#step).
 
 % Observations
 obs(#fluent, #boolean, #step).
@@ -49,5 +45,3 @@ holds(in_hand(P, O), I+1) :- occurs(serve(R, O, P), I).
 %% Serving an object causes the object to not be in robot's hand...
 -holds(in_hand(R, O), I+1) :- occurs(serve(R, O, P), I).
 
-%% Affixing a label causes the item to be labelled.
-holds(is_labelled(X, true), I+1) :- occurs(affix_label(R,X),I).
