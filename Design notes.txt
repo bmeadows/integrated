@@ -25,10 +25,11 @@ Items completed:
 Items in progress:
 ==========================
 17. Update smaller domain for RRL.
-18. Ensure there can be no problems with no observation of an action being given at a time step that has passed, so that ASP inappropriately re-plans it.
-19. Finally in perform_active_action_learning, add observations about the exoaction occurring for ASP, and then call ASP. Also place some hooks for history resets, e.g. after each such episode.
-	(It may be better to only reset after all active action learning has finished, but this has risks e.g. more actions were learned than there are time steps by default in the ASP program.)
-	Make sure hpd(#action,#step) is correct for demonstrated actions. No need to store 'exogenous' predicate as previous.
+18. Design check: Ensure there can be no problems with no observation of an action being given at a time step that has passed, so that ASP inappropriately re-plans it.
+19. At end of perform_active_action_learning, add observations about the exoaction occurring for ASP, and then call ASP as if planning.
+	- Additionally, place some hooks for history resets, e.g. after each such episode.
+	- (It may be better to only reset after all active action learning has finished, but this has risks e.g. more actions were learned than there are time steps by default in the ASP program. Note this down.)
+	- Make sure hpd(#action,#step) is correctly created, stored, and provided to ASP for these demonstrated actions. No need to store 'exogenous' predicate as before.
 
 ==========================
 Items remaining:
