@@ -26,7 +26,7 @@ Items in progress:
 ==========================
 17. Update smaller domain for RRL.
 18. Design check: Ensure there can be no problems with no observation of an action being given at a time step that has passed, so that ASP inappropriately re-plans it.
-19. At end of perform_active_action_learning, add observations about the exoaction occurring for ASP, and then call ASP as if planning.
+19. At end of perform_active_action_learning, add observations about the exogenous/human action occurring for ASP, and then call ASP as if planning.
 	- Additionally, place some hooks for history resets, e.g. after each such episode.
 	- (It may be better to only reset after all active action learning has finished, but this has risks e.g. more actions were learned than there are time steps by default in the ASP program. Note this down.)
 	- Make sure hpd(#action,#step) is correctly created, stored, and provided to ASP for these demonstrated actions. No need to store 'exogenous' predicate as before.
@@ -54,7 +54,7 @@ Items remaining:
 - Content from the answer set is stored in various ways in the control loop. All of these must be updated with new times, and possibly statuses.
 - Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
 - May be useful to keep a measure of 'true' time, tracked separately from the reset history.
-25. Integrate the RRL component into the main loop.
+25. Check integrtion of RRL component into the main control loop.
 26. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
 
 
