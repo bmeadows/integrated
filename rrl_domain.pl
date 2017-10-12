@@ -328,8 +328,6 @@ change_att_value(Input, Return) :-
 % Returns a number identifying the target axiom, or returns it back for "does not match any target axiom"
 
 % 1. Learning that a person cannot be served in a library [EXECUTABILITY CONDITION]
-domainAxiomClassifier([ [attr(surface(prin1, brittle))], [] ], 1) :- domainGoalAction(putdown(rob1,prin1)), !.
-domainAxiomClassifier([ [], [attr(surface(prin1, hard))] ], 1) :- domainGoalAction(putdown(rob1,prin1)), !.
 
 % 2. Learning that serving a person in a workshop causes them to leave [CAUSAL LAW]
 
