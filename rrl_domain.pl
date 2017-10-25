@@ -28,9 +28,11 @@ domain(sort(Term1)) :- subsort(General,Specific), functor(Term1,General,1), arg(
 
 % = currentState(attr()) ? TODO resolve
 
-domain(attr(type(rmwor,workshop))).
-domain(attr(type(rmoff,office))).
-domain(attr(type(rmlib,library))).
+currentState(attr(type(rmwor,workshop))).
+currentState(attr(type(rmoff,office))).
+currentState(attr(type(rmlib,library))).
+
+currentState(fluent(loc(O,L))) :- domain(sort(object(O))), currentState(fluent(in_hand(X,O))), domain(sort(entity(X))), currentState(fluent(loc(X,L))).
 
 %
 
@@ -46,6 +48,7 @@ valid(action(putdown(R,O))) :- domain(sort(robot(R))), domain(sort(item(O))).
 valid(action(move(R,L))) :- domain(sort(robot(R))), domain(sort(location(L))).
 valid(action(serve(R,O,P))) :- domain(sort(robot(R))), domain(sort(item(O))), domain(sort(person(P))).
 valid(action(affix_label(R,O))) :- domain(sort(robot(R))), domain(sort(item(O))).
+valid(action(wait(R))) :- domain(sort(robot(R))).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -62,8 +65,6 @@ stateConstraintsViolated :- currentState(fluent(in_hand(H1,O))), currentState(fl
 stateConstraintsViolated :- currentState(fluent(in_hand(H,O1))), currentState(fluent(in_hand(H,O2))), O1 \= O2. % Same entity has two things in hand
 stateConstraintsViolated :- domain(sort(thing(E))), not(currentState(fluent(loc(E,_)))). % An entity or object not at a place
 stateConstraintsViolated :- currentState(X), not(valid(X)).
-
-currentState(fluent(loc(O,L))) :- currentState(fluent(in_hand(X,O))), currentState(fluent(loc(X,L))).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -100,16 +101,22 @@ applyActionToState(Action) :-
 
 applyActionToStateFinal(move(Robot, Loc)) :-
 	currentState(fluent(in_hand(Robot, O))),
-	retractall(	currentState(fluent(loc(O,_)))), % May or may not be overt
-	retractall(	currentState(fluent(loc(Robot,_)))),
+	retract_facts_only(	currentState(fluent(loc(O,_)))), % May or may not be overt
+	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 applyActionToStateFinal(move(Robot, Loc)) :-
 	not(currentState(fluent(in_hand(Robot, _)))),
-	retractall(	currentState(fluent(loc(Robot,_)))),
+	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 
+% (To be learned: A person cannot be served in a library)
+applyActionToStateFinal(serve(R, _Obj, _P)) :-
+	currentState(fluent(loc(R, Loc))),
+	currentState(attr(type(Loc, library))),
+	!.
+	
 % Succeeded serve: none of the above cases applied
 applyActionToStateFinal(serve(R, Obj, P)) :-
 	currentState(fluent(loc(R, Loc))),
@@ -117,8 +124,8 @@ applyActionToStateFinal(serve(R, Obj, P)) :-
 	currentState(fluent(in_hand(R, Obj))),
 	not(currentState(fluent(in_hand(P, _)))),
 	assert(currentState(fluent(in_hand(P, Obj)))),
-	retract(currentState(fluent(in_hand(R, Obj)))),
-	retractall(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of e.g. exogenous events - it's served and then the person moves
+	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
+	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of e.g. exogenous events - it's served and then the person moves
 	!.
 
 % Succeeded pickup: none of the above cases applied
@@ -127,7 +134,7 @@ applyActionToStateFinal(pickup(R, Obj)) :-
 	currentState(fluent(loc(Obj, Loc))),
 	not(currentState(fluent(in_hand(_, Obj)))),
 	assert(currentState(fluent(in_hand(R, Obj)))),
-	retractall(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of e.g. exogenous events - it's served and then the person moves
+	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of e.g. exogenous events - it's served and then the person moves
 	!.
 
 % Succeeded putdown
@@ -154,8 +161,8 @@ applyActionToStateFinal(Something) :-
 
 actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location]).
 causal_law(move(Robot, Destination), [], [fluent(loc(Robot, Destination))]).
-causal_law(move(Robot, Destination), [fluent(loc(Robot, X))], [not(fluent(loc(Robot, X)))]).
-causal_law(move(Robot, Destination), [fluent(in_hand(Robot, Object)), fluent(loc(Robot, X))], [not(fluent(loc(Object, X)))]).
+causal_law(move(Robot, _Destination), [fluent(loc(Robot, X))], [not(fluent(loc(Robot, X)))]).
+causal_law(move(Robot, _Destination), [fluent(in_hand(Robot, Object)), fluent(loc(Robot, X))], [not(fluent(loc(Object, X)))]).
 impossible_if(move(Robot, Destination), 10) :-
 	currentState(fluent(loc(Robot, Destination))).
 
@@ -166,13 +173,15 @@ causal_law(putdown(Robot, Object), [fluent(loc(Robot,L))], [not(fluent(in_hand(R
 impossible_if(putdown(Robot, Object), 21) :-
 	not(currentState(fluent(in_hand(Robot, Object)))).
 
-actionDescription(wait(Robot), [Robot], [robot], []).
+%
+actionDescription(wait(Robot), [Robot], [robot]).
+%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 actionDescription(serve(Robot, Obj, Person), [Robot, Obj, Person], [robot, item, person]).
 causal_law(serve(Robot, Obj, Person), [], [fluent(in_hand(Person, Obj)), not(fluent(in_hand(Robot, Obj)))]).
-causal_law(serve(Robot, Obj, Person), [fluent(loc(Robot, Loc))], [not(fluent(loc(Obj, Loc)))]).
+causal_law(serve(Robot, Obj, _Person), [fluent(loc(Robot, Loc))], [not(fluent(loc(Obj, Loc)))]).
 impossible_if(serve(Robot, _Obj, Person), 30) :-
 	not((	currentState(fluent(loc(Robot, Location))),
 			currentState(fluent(loc(Person, Location))) )).
@@ -203,7 +212,7 @@ impossible_if(pickup(Robot, _Object), 43) :-
 % Observed unexpected state: Fluents depend on target action
 setObservedUnexpectedState :-
 	assert(lastActionWas(none)),
-	retractall(currentState(fluent(_))),
+	retract_facts_only(currentState(fluent(_))),
 	retractall(step(_)),
 	assert(step(1)),
 	unexpectedStateFluents(S),
@@ -212,7 +221,7 @@ setObservedUnexpectedState :-
 % The state is reset at random for each sequence of episodes.
 resetStateAtRandom :-
 	assert(lastActionWas(none)),
-	retractall(currentState(fluent(_))),
+	retract_facts_only(currentState(fluent(_))),
 	retractall(step(_)),
 	assert(step(1)),
 	setupFluentsRandomly,
@@ -241,8 +250,8 @@ setObjLocationsRandomlyUntilValid(List) :-
 
 retractAllLocations([]) :- !.
 retractAllLocations([A|B]) :-
-	retractall(currentState(fluent(loc(A,_)))),
-	retractall(currentState(fluent(in_hand(_,A)))),
+	retract_facts_only(currentState(fluent(loc(A,_)))),
+	retract_facts_only(currentState(fluent(in_hand(_,A)))),
 	retractAllLocations(B).
 
 randomiseAllLocations([]) :- !.
@@ -276,7 +285,7 @@ assertOneXAtRandom(List) :-
 	assert(X).
 	
 setRandomInitialObjectConfig :-
-	retractall(domain(attr(_))),
+	retract_facts_only(currentState(attr(_))),
 	Alts = [office, library, workshop],
 	random_member(RA, Alts),
 	random_member(RB, Alts),
@@ -286,7 +295,7 @@ setRandomInitialObjectConfig :-
 	true.
 
 
-% This is passed in a list of RELEVANT object properties
+% This is passed in a list of RELEVANT object properties as [... attr(X), ...]
 domainChangeObjectAtts(List) :-
 	!,
 	domainChangeObjectAttsRand(List).
@@ -294,8 +303,8 @@ domainChangeObjectAtts(List) :-
 domainChangeObjectAttsRand(List) :-
 	random_member(X,List), % Pick one literal representing a static attribute to change at random
 	change_att_value(X, Y), % Make a valid change to something other than the original value
-	retractall(domain(X)),
-	assert(domain(Y)).
+	retract_facts_only(currentState(X)),
+	assert(currentState(Y)).
 
 change_att_value(Input, Return) :-
 	Input = attr(Term1),
@@ -311,23 +320,49 @@ change_att_value(Input, Return) :-
 	Return = attr(Term3),
 	!.
 
-	
-	
-
-% Physical configurations:
-% 2 entities in 3 locations = 3^2 = 9
-% 1 item that can be held (at most 1 per agent) or at location (any number at a location) = 5
-% 9 * 5 = 45 physical configurations
-
-% Object property configurations:
-% 3 object property configurations
-
 
 
 
 % Returns a number identifying the target axiom, or returns it back for "does not match any target axiom"
 
 % 1. Learning that a person cannot be served in a library [EXECUTABILITY CONDITION]
+% ( ) Location determined negatively
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(book1,rmoff)),fluent(loc(book1,rmwor))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(book1,rmoff)),fluent(loc(p0,rmwor))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(book1,rmwor)),fluent(loc(p0,rmoff))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(book1,rmoff)),fluent(loc(rob1,rmwor))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(book1,rmwor)),fluent(loc(rob1,rmoff))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(p0,rmoff)),fluent(loc(rob1,rmwor))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(rmlib, library))], [fluent(loc(p0,rmwor)),fluent(loc(rob1,rmoff))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+% (a) Location determined by p0
+domainAxiomClassifier([ [attr(type(L, library)), fluent(loc(p0,L))], [] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [fluent(loc(p0,L))], [attr(type(L, office)), attr(type(L, workshop))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L1)), fluent(loc(p0,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L2)), fluent(loc(p0,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+% (b) Location determined by rob1
+domainAxiomClassifier([ [attr(type(L, library)), fluent(loc(rob1,L))], [] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [fluent(loc(rob1,L))], [attr(type(L, office)), attr(type(L, workshop))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(rob1,L1)), fluent(loc(rob1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(rob1,L2)), fluent(loc(rob1,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+% (c) Location determined by book1
+domainAxiomClassifier([ [attr(type(L, library)), fluent(loc(book1,L))], [] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [fluent(loc(book1,L))], [attr(type(L, office)), attr(type(L, workshop))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L1)), fluent(loc(book1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L2)), fluent(loc(book1,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+% (d) Location determined by mix
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L1)), fluent(loc(rob1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L2)), fluent(loc(rob1,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L2)), fluent(loc(p0,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L1)), fluent(loc(p0,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L2), fluent(loc(rob1,L1)))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(p0,L1)), fluent(loc(rob1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L2)), fluent(loc(rob1,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L1)), fluent(loc(rob1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L1)), fluent(loc(rob1,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L2)), fluent(loc(rob1,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L1)), fluent(loc(p0,L2))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+domainAxiomClassifier([ [attr(type(L1, office)), attr(type(L2, workshop))], [fluent(loc(book1,L2)), fluent(loc(p0,L1))] ], 1) :- domainGoalAction(serve(rob1,book1,p0)), !.
+
 
 % 2. Learning that serving a person in a workshop causes them to leave [CAUSAL LAW]
 
@@ -344,37 +379,40 @@ domainAxiomClassifier([YesLiterals,NoLiterals], [YesLiterals,NoLiterals]) :- !.
 
 
 
-	
 
-/* "Even when book1 is damaged and served to a non-engineer, under conditions [book1 is labelled], 'serve(rob1,book1,p1)' is possible" */
+
+
+% Physical configurations:
+% 2 entities in 3 locations = 3^2 = 9
+% 1 item that can be held (at most 1 per agent) or at location (any number at a location) = 5
+% 9 * 5 = 45 physical configurations
+
+% Object property configurations:
+% 3 object property configurations
+
+/*  */
 cached :-
 	domainGoalAction(Action),
 	Action =.. [_Predicate|ArgList],
-	assert(targetActionArgs(ArgList)), % Is this even needed???
+	assert(targetActionArgs(ArgList)), % TODO check if this is still used
 	assert(allValidTests([
-		attr(arm_type(rob1,electromagnetic)),attr(arm_type(rob1,pneumatic)),
-		attr(obj_weight(book1,heavy)),attr(obj_weight(book1,light)),
-		attr(surface(book1,brittle)),attr(surface(book1,hard)),
-		attr(role_type(p1,engineer)),attr(role_type(p1,sales)),attr(role_type(p1,manager)),
-		fluent(item_status(book1,intact)),fluent(item_status(book1,damaged)),
-		fluent(labelled(book1,false)),fluent(labelled(book1,true)),
-		fluent(loc(book1,kitchen)),fluent(loc(book1,library)),fluent(loc(book1,office)),fluent(loc(book1,workshop)),
-		fluent(loc(rob1,kitchen)),fluent(loc(rob1,library)),fluent(loc(rob1,office)),fluent(loc(rob1,workshop)),
-		fluent(loc(p1,kitchen)),fluent(loc(p1,library)),fluent(loc(p1,office)),fluent(loc(p1,workshop)),
-		fluent(in_hand(p1,book1)),fluent(in_hand(rob1,book1)),
-		action(serve(rob1,book1,p1)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,office)),action(move(rob1,workshop)),action(move(rob1,kitchen)),action(move(rob1,library)),action(affix_label(rob1,book1))
+		attr(type(rmwor,workshop)),attr(type(rmwor,office)),attr(type(rmwor,library)),
+		attr(type(rmoff,office)),attr(type(rmoff,workshop)),attr(type(rmoff,library)),
+		attr(type(rmlib,library)),attr(type(rmlib,workshop)),attr(type(rmlib,office)),
+		fluent(loc(book1,rmwor)),fluent(loc(book1,rmoff)),fluent(loc(book1,rmlib)),
+		fluent(loc(rob1,rmwor)),fluent(loc(rob1,rmoff)),fluent(loc(rob1,rmlib)),
+		fluent(loc(p0,rmwor)),fluent(loc(p0,rmoff)),fluent(loc(p0,rmlib)),
+		fluent(in_hand(p0,book1)),fluent(in_hand(rob1,book1)),
+		action(serve(rob1,book1,p0)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,rmwor)),action(move(rob1,rmoff)),action(move(rob1,rmlib))
 		])),
-	assert(num_possible_attribute_configs(24)),
+	assert(num_possible_attribute_configs(3)),
 	assert(usableActionList(
-		[action(serve(rob1,book1,p1)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,office)),action(move(rob1,workshop)),action(move(rob1,kitchen)),action(move(rob1,library)),action(affix_label(rob1,book1))]
+		[action(serve(rob1,book1,p0)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,rmwor)),action(move(rob1,rmoff)),action(move(rob1,rmlib))]
 		)).
 %
-domainGoalAction(serve(rob1,book1,p1)).
-unexpectedResult([fluent(in_hand(p1,book1))]).
-unexpectedStateFluents([loc(p1,library),loc(p2,workshop),loc(p3,office),loc(rob1,library),in_hand(p3,prin1),
-	in_hand(rob1,book1),loc(cup1,workshop),loc(shelf1,library),loc(shelf2,kitchen),loc(desk1,office),loc(tab1,workshop),
-	labelled(cup1,false),labelled(book1,true),labelled(prin1,false),
-	item_status(cup1,intact),item_status(book1,damaged),item_status(prin1,intact)
+domainGoalAction(serve(rob1,book1,p0)).
+unexpectedResult([fluent(in_hand(rob1,book1))]).
+unexpectedStateFluents([loc(p0,rmlib),loc(rob1,rmlib),in_hand(rob1,book1)
 	]). % An actual state from which unexpected outcomes occurred. Others are possible.
 % executabilityConditionViolated(31). %(For affordances only)
 

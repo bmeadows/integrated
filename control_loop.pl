@@ -337,6 +337,12 @@ check_verbal_cue(_) :-
 	prettyprintln('Cue format not recognised.'),
 	request_verbal_cue.
 
+
+/*
+obs_ex_action(	"The person is shunting the book.",
+					[loc(book1,rmoff)],
+					5).*/
+
 perform_active_action_learning :-
 	obs_ex_action(TextString,B,C),
 	tell('vocalisation.txt'),
