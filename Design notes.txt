@@ -21,19 +21,31 @@ Items completed:
 15. Changed so that exoactions replace the need for an agent action to occur on each time step (to account for how active learning followed by consistency checking will work).
 16. Produced a smaller domain, standardised across the four components - control loop, cued action learning, RRL, ASP planning.
 17. Updated RRL component for relevance metric and for ASP-style inferred agent beliefs not stored in memory predicates.
+18. Now at end of perform_active_action_learning, history is reset, with the outcomes of the exogenous/human action added as observations to the new time zero. 
+	The ASP history never contains a record of an action being demonstrated. This avoids difficult function constructions where e.g.:
+	- The ASP observation hpd(#action,#step) is added to history at current time T;
+	- The occurrences of the effects are added to history at time T+1 before T is advanced;
+	- Answer sets must now be computed within each loop, not just in plan mode, so that exogenous effects demonstrated in the previous cycle are explained;
+	- The observation of the exoaction becomes a belief in its occurrence, and so when the answer sets are returned, it is stored as the next_plan_step.
+19. Placed additional hooks for history resets using the function reset_ASP_history(ListOfExtraObsToSetAtNewZero), for a total of four:
+	- At the end of the perform_active_action_learning function after having a human/exogenous action demonstrated;
+	- In the interior_loop function when not in plan mode and interrupted for e.g. a new goal;
+	- In the interior_loop function when exiting plan mode because there exists no unachieved goal;
+	- In the interior_loop function when exiting plan mode because a transition was not explained.
+	This so far seems sufficient for timely history resets.
+	- e.g.1, it is not reset before active verbal-cued learning, which could be engaged after many RRL cycles, but active verbal learning is agnostic to time steps (and resets history afterward).
+	- e.g.2, immediately before returning to plan mode, where time step does matter, a history reset is guaranteed.
+
 
 ==========================
 Items in progress:
 ==========================
-19. At end of perform_active_action_learning, add observations about the exogenous/human action occurring for ASP, and then call ASP as if planning.
-	- Additionally, place some hooks for history resets, e.g. after each such episode. Add those hooks too to any part of the control loop where execution would have just finished.
-	- (It may be better to only reset after all active action learning has finished, but this has risks e.g. more actions were learned than there are time steps in the ASP program. Note this down.)
-	- Make sure hpd(#action,#step) is correctly created, stored, and provided to ASP for these demonstrated actions. No need to store 'exogenous' predicate as before.
+20. Return to question of automatically determining which type of axiom to learn. Is it solved?
+
 
 ==========================
 Items remaining:
 ==========================
-20. Return to question of automatically determining which type of axiom to learn. Is it open?
 21. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
 22. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
 23. Design and produce a full test domain, standardised across the four components.
@@ -56,8 +68,9 @@ Items remaining:
 - Decided: Change every holds(X,n) to obs(X,true,0). For every -holds(X,n), check that the most recent observation about X exists and was negative. If so make it obs(X,false,0). Otherwise in principle, its truth status could have fluctuated.
 25. Check integration of RRL component into the main control loop.
 26. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
-
-
+27. We have chosen to immediately reset history after every instance of active learning from verbal cues. It may be more efficient to only reset after all active action learning has finished, 
+	but then we would still need to ensure we e.g. reset before more demonstrations are given than time steps exist in the ASP model.
+28. Integrate RRL in a reasonable way, e.g., change static configuration and then the control loop's cycle ends; only stop RRL control loop cycles when learning is complete (or interrupted, in which case wipe any stored RRL data).
 
 
 
@@ -114,5 +127,6 @@ Is relevance used outside of RRL?
 12. Design note: If no observation of an action is given at a time step that has passed, ASP may inappropriately re-plan it... or fail to find any plan, if observations 
 after that step do not match any possible action. A user providing observations is not constrained. Bear in mind with regard to simulation. Note too that a 'failed' action must still record the action 
 as having occurred.
+13. Note that technically, exogenous actions are demonstrated during time step T, and then their consequences are occurred "at T+1" while still in step T. Ensure this does not cause problems. For example, we currently check the answer sets at the start of each cycle to integrate any possible exoactions demonstrated in the previous step.
 
 

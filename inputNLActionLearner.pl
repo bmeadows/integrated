@@ -1,4 +1,4 @@
-:- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1.
+:- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1, recurseOnDescs/1.
 
 % Includes
 :- include('wordnet/wn_s.pl').
@@ -53,16 +53,27 @@ exoActionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cu
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%1. Check buffer of unprocessed observations from the previous cycle (or... on interrupt) for tuples <string, [0 or more logical literals]>
+learnFromActionDesc(ReturnedAction) :-
+	obs_ex_action_tagged(A,B,C),
+	learnFromActionDescs([A,B,C], ReturnedAction),
+	!.
+learnFromActionDesc(no_action_to_learn).
+
+%1. Check an entire buffer of unprocessed observations from the previous cycle (or... on interrupt) for tuples <string, [0 or more logical literals]>
 learnFromDescs :-
 	findall([A,B,C], obs_ex_action_tagged(A,B,C), X),
-	learnFromActionDescs(X),
+	X=[Head|Tail],
+	!,
+	retractall(recurseOnDescs(_)),
+	assert(recurseOnDescs(Tail)),
+	learnFromActionDescs(Head),
 	retractall(obs_ex_action_tagged(_,_,_)).
+learnFromDescs.
 
 %2. Perform the following for each tuple in turn
 %3. Parse string into list of POS-tagged words
-learnFromActionDescs([]) :- translateLearnedActionDescsToPrologRules.
-learnFromActionDescs([A|B]) :-
+learnFromActionDescs([], learning_finished) :- !.
+learnFromActionDescs(A, Head) :-
 	A = [String,LiteralEffects,_Step],
 	prettyprintstars,
 	prettyprint('Tagged input string: '),
@@ -102,18 +113,15 @@ learnFromActionDescs([A|B]) :-
 		% Lift structure
 		(lift(GroundedActionDescription, LiftedActionDescription), assert(LiftedActionDescription))
 	),
-	currentTime(T),
-	assert(hpd(Head,T)),
+	translateLearnedActionDescsToPrologRules,
 	!,
-	learnFromActionDescs(B).
-learnFromActionDescs([A|B]) :-
+	(recurseOnDescs(Remainder) -> learnFromActionDescs(Remainder,_) ; true).
+learnFromActionDescs(N, learning_failed) :-
 	prettyprintstars,
 	prettyprint('Failed to learn from '),
-	prettyprint(A),
+	prettyprint(N),
 	prettyprintln('. Discarding and continuing.'),
-	prettyprintstars,
-	learnFromActionDescs(B).
-
+	prettyprintstars.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%	
 

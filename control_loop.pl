@@ -99,6 +99,7 @@ expected_to_obs([not(fluent(A))|B],T) :-
 interior_loop :-
 	inPlanMode(false),
 	interrupted, % New goal just assigned, or forced to plan. Assumption: The robot never has to abandon a goal in favour of another one, so this can only happen when not planning.
+	reset_ASP_history([]),
 	!,
 	retractall(inPlanMode(_)),
 	assert(inPlanMode(true)).
@@ -135,7 +136,8 @@ interior_loop :-
 		retractall(inPlanMode(_)),
 		assert(inPlanMode(false)),
 		retractall(learningMode(_)),
-		assert(learningMode(activeExplorationRRLOrActionLearning))
+		assert(learningMode(activeExplorationRRLOrActionLearning)),
+		reset_ASP_history([])
 		)
 	).
 
@@ -149,7 +151,8 @@ execute_plan :-
 	retractall(learningMode(_)),
 	assert(learningMode(rrlForSpecificUnexpectedTransition)),
 	retractall(last_transitions_failed(_)),
-	assert(last_transitions_failed(false)).
+	assert(last_transitions_failed(false)),
+	reset_ASP_history([]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -235,7 +238,7 @@ handle_answer_sets(List) :-
 	retractall(answer_set_goal(_)),
 	assertallgoals(GoalsMet),
 	
-	% 7. Get first found plan step and store it as next_plan_step(NPS); note handle_answer_sets is only called when 1 or more exists
+	% 7. Get first found plan step and store it as next_plan_step(NPS); note handle_answer_sets is only called when 1 or more answer sets exist
 	% However, there might be no plan step because there is no goal
 	retractall(next_plan_step(_)),
 	List = [First|_],
@@ -330,11 +333,12 @@ request_verbal_cue :-
 check_verbal_cue('c') :-
 	!,
 	fail. % In this case, should backtrack to retry the next clause of the interior_loop s.t. learningMode(activeExplorationRRLOrActionLearning).
-check_verbal_cue([A,B,C]) :-
+check_verbal_cue([A,B]) :-
 	!,
+	currentTime(C),
 	assert(obs_ex_action(A,B,C)).
 check_verbal_cue(_) :-
-	prettyprintln('Cue format not recognised.'),
+	prettyprintln('Cue format not recognised. Expected: ["Sentence",[List,Of,Consequences]]; use "not" for negated consequences.'),
 	request_verbal_cue.
 
 
@@ -344,7 +348,7 @@ obs_ex_action(	"The person is shunting the book.",
 					5).*/
 
 perform_active_action_learning :-
-	obs_ex_action(TextString,B,C),
+	obs_ex_action(TextString,Cons,ObsTime),
 	tell('vocalisation.txt'),
 	write(TextString),
 	nl,
@@ -354,18 +358,46 @@ perform_active_action_learning :-
 	shell('tagging.bat', _ExitStatus),
 	read_file_to_string('tagged.txt', TS, []),
 	atom_codes(TextString2,TS),
-	assert(obs_ex_action_tagged(TextString2,B,C)),
-	retract(obs_ex_action(TextString,B,C)).
-%	perform_active_action_learning. % Repeat for any more verbal cues stored
-perform_active_action_learning :-
-	% Finally, perform learning over tagged text descriptions
+	assert(obs_ex_action_tagged(TextString2,Cons,ObsTime)),
+	retract(obs_ex_action(TextString,Cons,ObsTime)),
+	learnFromActionDesc(ExtractedAction), % Finally, perform learning over tagged text descriptions
+	collate_demonstrated_exoaction_consequences(Cons,ListOfExtraObsToSetAtNewZero),
+	reset_ASP_history(ListOfExtraObsToSetAtNewZero).
+% Previously recursive... when multiple verbal cues could be stored.
+
+collate_demonstrated_exoaction_consequences([],[]).
+collate_demonstrated_exoaction_consequences([not(A)|TailConsequences],[HeadReturn|TailReturn]) :-
+	HeadReturn = obs(A,false,0),
 	!,
-	learnFromDescs.
-	
+	collate_demonstrated_exoaction_consequences(TailConsequences,TailReturn).
+collate_demonstrated_exoaction_consequences([A|TailConsequences],[HeadReturn|TailReturn]) :-
+	HeadReturn = obs(A,true,0),
+	!,
+	collate_demonstrated_exoaction_consequences(TailConsequences,TailReturn).
+
+
+/*
+addActiveLearnedObservations(ExtractedAction,Consequences,Time) :-
+	assert(hpd(ExtractedAction,Time)),
+	T2 is Time + 1,
+	assert_each_consequence(Consequences,T2).
+assert_each_consequence([],_).
+assert_each_consequence([not(A)|B],Time) :-
+	assert(obs(A,false,Time)),
+	!,
+	assert_each_consequence(B,Time).
+assert_each_consequence([A|B],Time) :-
+	assert(obs(A,true,Time)),
+	!,
+	assert_each_consequence(B,Time).
+*/
+
 /*
 continue_RRL_for_specific_unexpected_transition :- ?
 
 continue_exploratory_RRL :- ?
+
+reset_ASP_history(ListOfExtraObsToSetAtNewZero) :- ? % [obs(A,true,0), obs(B,false,0), ...]
 */
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
