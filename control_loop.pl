@@ -99,6 +99,7 @@ expected_to_obs([not(fluent(A))|B],T) :-
 interior_loop :-
 	inPlanMode(false),
 	interrupted, % New goal just assigned, or forced to plan. Assumption: The robot never has to abandon a goal in favour of another one, so this can only happen when not planning.
+	prettyprintln('(interrupted)'),
 	reset_ASP_history([]),
 	!,
 	retractall(inPlanMode(_)),
@@ -137,6 +138,7 @@ interior_loop :-
 		assert(inPlanMode(false)),
 		retractall(learningMode(_)),
 		assert(learningMode(activeExplorationRRLOrActionLearning)),
+		prettyprintln('(exists_unachieved_goal failed: switching to activeExplorationRRLOrActionLearning)'),
 		reset_ASP_history([])
 		)
 	).
@@ -160,8 +162,10 @@ execute_plan :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 exists_unachieved_goal :-
+	answer_set_goal(N),prettyprintln(N),
 	not(( answer_set_goal(I), % answer_set_goal(I) only encodes that the last answer sets agree the goal is (was, will be) fulfilled at time step I
-	currentTime(I) )).
+	currentTime(I) )),
+	prettyprintln('(exists_unachieved_goal succeeded)').
 	% e.g.1 Current time is 2. Answer set describes plan steps at times 0, 1, 2 such that goal is met at time 3. This includes observations of actions at times 0, 1, so it does not re-plan these.
 	% So answer set includes {goal(3), goal(4), ...}. So goal is not achieved, so exists_unachieved_goal is true.
 	% e.g.2 Current time is 3. Answer set describes plan steps at times 0, 1, 2 such that goal is met at time 3. This includes observations of actions at times 0, 1, 2, so it does not re-plan these.
@@ -233,7 +237,7 @@ handle_answer_sets(List) :-
 	assertallzero(TimeZero),*/
 	
 	findall( I,
-			not(( member(SubList,List), not(member(goal(I),SubList)) )),
+			(member(I, [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]), not(( member(SubList,List), not(member(goal(I),SubList)) )) ),
 			GoalsMet),
 	retractall(answer_set_goal(_)),
 	assertallgoals(GoalsMet),
@@ -259,6 +263,8 @@ reset_times :-
 
 assertallgoals([]).
 assertallgoals([A|B]) :-
+	prettyprint('Adding goal: '),
+	prettyprintln(A),
 	assert(answer_set_goal(A)),
 	assertallgoals(B).
 	
@@ -392,13 +398,16 @@ assert_each_consequence([A|B],Time) :-
 	assert_each_consequence(B,Time).
 */
 
-/*
-continue_RRL_for_specific_unexpected_transition :- ?
+% TODO
+continue_RRL_for_specific_unexpected_transition :- trace.
 
-continue_exploratory_RRL :- ?
+% TODO
+continue_exploratory_RRL :- trace.
 
-reset_ASP_history(ListOfExtraObsToSetAtNewZero) :- ? % [obs(A,true,0), obs(B,false,0), ...]
-*/
+% TODO
+% [obs(A,true,0), obs(B,false,0), ...]
+reset_ASP_history(ListOfExtraObsToSetAtNewZero) :- trace.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

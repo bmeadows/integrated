@@ -35,16 +35,11 @@ Items completed:
 	This so far seems sufficient for timely history resets.
 	- e.g.1, it is not reset before active verbal-cued learning, which could be engaged after many RRL cycles, but active verbal learning is agnostic to time steps (and resets history afterward).
 	- e.g.2, immediately before returning to plan mode, where time step does matter, a history reset is guaranteed.
+20. Tested integrated system in small domain; fixed detection of met or unmet ASP goals via 'exists_unachieved_goal' so that switching works correctly.
 
 
 ==========================
 Items in progress:
-==========================
-20. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
-
-
-==========================
-Items remaining:
 ==========================
 21. Implement ASP history resetting.
 - Turn everything that holds into observations at time step zero. They cannot remain beliefs, otherwise they will be lost when the answer set is calculated.
@@ -63,6 +58,11 @@ Items remaining:
 - Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
 - May be useful to keep a measure of 'true' time, tracked separately from the reset history.
 - Decided: Change every holds(X,n) to obs(X,true,0). For every -holds(X,n), check that the most recent observation about X exists and was negative. If so make it obs(X,false,0). Otherwise in principle, its truth status could have fluctuated.
+
+
+==========================
+Items remaining:
+==========================
 22. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
 23. Design and produce a full test domain, standardised across the four components.
 24. Check integration of RRL component into the main control loop.
@@ -77,6 +77,8 @@ Items remaining:
 27. We have chosen to immediately reset history after every instance of active learning from verbal cues. It may be more efficient to only reset after all active action learning has finished, 
 	but then we would still need to ensure we e.g. reset before more demonstrations are given than time steps exist in the ASP model.
 28. Integrate RRL in a reasonable way, e.g., change static configuration and then the control loop's cycle ends; only stop RRL control loop cycles when learning is complete (or interrupted, in which case wipe any stored RRL data).
+
+
 
 
 
@@ -134,5 +136,4 @@ Is relevance used outside of RRL?
 after that step do not match any possible action. A user providing observations is not constrained. Bear in mind with regard to simulation. Note too that a 'failed' action must still record the action 
 as having occurred.
 13. Note that technically, exogenous actions are demonstrated during time step T, and then their consequences are occurred "at T+1" while still in step T. Ensure this does not cause problems. For example, we currently check the answer sets at the start of each cycle to integrate any possible exoactions demonstrated in the previous step.
-
 
