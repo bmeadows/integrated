@@ -40,16 +40,13 @@ Items completed:
 ==========================
 Items in progress:
 ==========================
-20. Return to question of automatically determining which type of axiom to learn. Is it solved?
+20. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
 
 
 ==========================
 Items remaining:
 ==========================
-21. Test integrated system in small domain. Check that exists_unachieved_goal works correctly (answer set lists goals that are met; check whether their time equals current time)
-22. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
-23. Design and produce a full test domain, standardised across the four components.
-24. Implement ASP history resetting.
+21. Implement ASP history resetting.
 - Turn everything that holds into observations at time step zero. They cannot remain beliefs, otherwise they will be lost when the answer set is calculated.
 - Using the reset conservatively would result in higher accuracy, since it may include restructuring of assumptions into initial facts.
 - As it is an approximation, to avoid over-constraining, do not give -holds beliefs as observations.
@@ -66,7 +63,16 @@ Items remaining:
 - Past observations, obs() and hpd(), must be dealt with appropriately. The beliefs they engendered becoming observed facts may be enough, in which case only delete them.
 - May be useful to keep a measure of 'true' time, tracked separately from the reset history.
 - Decided: Change every holds(X,n) to obs(X,true,0). For every -holds(X,n), check that the most recent observation about X exists and was negative. If so make it obs(X,false,0). Otherwise in principle, its truth status could have fluctuated.
-25. Check integration of RRL component into the main control loop.
+22. If possible, store more axioms only in the main Prolog domain file and dynamically translate when constructing ASP program.
+23. Design and produce a full test domain, standardised across the four components.
+24. Check integration of RRL component into the main control loop.
+25. We can determine which kind of learning opportunity exists, and thus which type of axiom to learn with RRL.
+	- 'continue_RRL_for_specific_unexpected_transition' starts from a situation with an unexpected side effect [causal law learning], or only a subset of the expected effects [negative learning].
+	- Negative learning results in the construction of an axiom that either does or does not include agents' or objects' static attribute conditions [negative affordances or executability conditions respectively];
+		the RRL component does not require these to be distinguished before engaging in learning.
+	- 'continue_exploratory_RRL' is an attempt to discover positive affordances, expecting failure due to violate executability conditions and resulting in the 'expected' effects.
+	- For now, we ignore the corner cases that follow (positive affordances leading to a different suite of effects for an action, etc).
+	- Implement and alter interfacing with RRL to meet these standards.
 26. Automatically add learned RRL axioms to the ASP file. This will likely require setting up the ASP infrastructure for affordances.
 27. We have chosen to immediately reset history after every instance of active learning from verbal cues. It may be more efficient to only reset after all active action learning has finished, 
 	but then we would still need to ensure we e.g. reset before more demonstrations are given than time steps exist in the ASP model.
