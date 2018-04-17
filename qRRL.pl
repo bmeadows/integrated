@@ -21,7 +21,6 @@ sumQCollector/1, countCollector/1, random_sampling_count/1, number_of_random_sam
 % 5. Output functions
 % 6. Debug registers
 % 7. Q-RRL functionality
-%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

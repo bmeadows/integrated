@@ -1,5 +1,5 @@
 
-2018 version fixes:
+===== 2018 version fixes =====
 
 01. Fixed broken functionality in storeRLStatisticsEachEpisode that should have updated episode_high_val.
 02. Restored learning rate change functionality.
