@@ -132,8 +132,6 @@ stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent
 
 
 
-
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

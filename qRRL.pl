@@ -2419,4 +2419,3 @@ permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
 				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = attr(N2), valid(N), N2 \= ContentTerm),
 				ReturnList
 	).
-

@@ -15,4 +15,3 @@
 12. Removed deprecated comments and documentation for prior versions.
 13. Added documentation for data_collector.pl, rrl_d.
 14. Replaced 'domain_test_alternatives' predicate functionality in domain with equivalent system-level functionality and option for domain to add additional cases.
-
