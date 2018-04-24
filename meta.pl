@@ -95,11 +95,11 @@ applyNoiseWhereAppropriate :- trace.
 switchAFluent :-
 	findall(fluent(Fl), currentState(fluent(Fl)), FList),
 	random_member(F, FList),
-	domain_test_alternatives(F, AltList),
+	get_all_alternative_domain_tests(F, AltList),
 	retract(currentState(F)),
 	random_member(NewFluent, AltList),
 	assert(currentState(NewFluent)),
-	(stateConstraintsViolated -> switchAFluent ; true). % Very important - just replacing with something from domain_test_alternatives can still result in causal violation.
+	(stateConstraintsViolated -> switchAFluent ; true). % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
 	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
 	
 switchActionOutcome :-
@@ -112,10 +112,10 @@ switchActionOutcome :-
 	; 
 	(random_member(Fluent, List), % Take one at random
 	assert(currentState(Fluent)),
-	domain_test_alternatives(Fluent, AltList),
+	get_all_alternative_domain_tests(Fluent, AltList),
 	retracteachfromstate(AltList), % First attempt to obey state constraints
 	% If still inconsistent, fall back on changing a RANDOM fluent - this should not be a recursive call to switchActionOutcome
-	(stateConstraintsViolated -> switchAFluent ; true) % Very important - just replacing with something from domain_test_alternatives can still result in causal violation.
+	(stateConstraintsViolated -> switchAFluent ; true) % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
 	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
 	)),
 	!.

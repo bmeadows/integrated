@@ -13,4 +13,6 @@
 10. Made registered CPU time information print to the correct output stream.
 11. Added consistent file headers.
 12. Removed deprecated comments and documentation for prior versions.
+13. Added documentation for data_collector.pl, rrl_d.
+14. Replaced 'domain_test_alternatives' predicate functionality in domain with equivalent system-level functionality and option for domain to add additional cases.
 

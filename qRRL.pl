@@ -11,6 +11,8 @@ clause2count/1, clause3count/1, finaloutputfile/1, output_file_counter/1, output
 total_config_count/1, learned_config/1, episode_high_val/3, examplepathrecord/5, semifinalexample/6, finalexample/5, candidate_axiom/7, final_axiom/7, lastActionWas/1, last_split_at/1, 
 sumQCollector/1, countCollector/1, random_sampling_count/1, number_of_random_sample_draws_to_make/1, affectedLeavesThisConfig/1, number_of_configs_to_search/1, noiseChancePercent/1.
 
+:- discontiguous permitted_domain_test_alternatives/2.
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contents
@@ -1518,14 +1520,14 @@ swapOut(Literal) :-
 swapOut(Literal) :-
 	currentState(Literal),
 	retract_facts_only(currentState(Literal)),
-	domain_test_alternatives(Literal, AltList),
+	get_all_alternative_domain_tests(Literal, AltList),
 	random_member(Alt, AltList),
 	assert(currentState(Alt)).
 swapIn(Literal) :-
 	currentState(Literal),
 	!.
 swapIn(Literal) :-
-	domain_test_alternatives(Literal, AltList),
+	get_all_alternative_domain_tests(Literal, AltList),
 	deleteAllLits(AltList),
 	assert(currentState(Literal)).
 	
@@ -2389,4 +2391,32 @@ change_learning_rate :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Term is either attr( ) or fluent( )
+get_all_alternative_domain_tests(Term, ReturnList) :-
+	findall(List,
+			permitted_domain_test_alternatives(Term, List),
+			UnflattenedList),
+	flatten(UnflattenedList, FlatList),
+	sort(FlatList, ReturnList),
+	(ReturnList == [] -> (writef('Error: get_all_alternative_domain_tests failed due to bad argument.'), trace) ; true).
+
+% Note that for fluents specifically, looser in terms of sharing a single argument in a single position.
+% e.g. loc(x,y) will substitute both for loc(w,y) and loc(x,z)!
+permitted_domain_test_alternatives(fluent(ContentTerm), ReturnList) :-
+	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
+	SomeNumberOfArgs > 1,
+	!,
+	findall(	N, % Find all static attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
+				(functor(N2, ContentPred, SomeNumberOfArgs), arg(SomeInt, ContentTerm, FirstArg), arg(SomeInt, N2, FirstArg), N = fluent(N2), valid(N), N2 \= ContentTerm),
+				ReturnList
+	).
+permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
+	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
+	SomeNumberOfArgs > 1,
+	arg(1, ContentTerm, FirstArg),
+	!,
+	findall(	N, % Find all static attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
+				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = attr(N2), valid(N), N2 \= ContentTerm),
+				ReturnList
+	).
 

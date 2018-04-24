@@ -6,17 +6,25 @@
  */
 
 :- dynamic step/1.
-:- discontiguous actionDescription/3, impossible_if/2, causal_law/3.
+:- discontiguous actionDescription/3, impossible_if/2, causal_law/3, currentState/1.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Contents
+% 1. Abstract domain description
+% 2. Domain details
+% 3. State constraints
+% 4. 
+% 5. 
+% 6. 
+% 7. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%% 1. Abstract domain description %%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Causal law format:
-%   causal_law(Action, FluentsAndStaticsThatMustHold, Consequences).
-% Can have multiple causal laws per action.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+% Domain sort hierarchy
 subsort(thing, object).
 subsort(thing, entity).
 subsort(entity, robot).
@@ -40,39 +48,23 @@ domain(sort(book(cup1))).
 %
 domain(sort(Term1)) :- subsort(General,Specific), functor(Term1,General,1), arg(1,Term1,Arg), functor(Term2,Specific,1), arg(1,Term2,Arg), domain(sort(Term2)).
 
-currentState(attr(type(rmwor,workshop))).
-currentState(attr(type(rmoff,office))).
-currentState(attr(type(rmlib,library))).
-
-currentState(attr(role(p0,engineer))).
-currentState(attr(role(p1,manager))).
-currentState(attr(role(p2,sales))).
-
-currentState(attr(arm_type(rob1,pneumatic))).
-
-currentState(attr(obj_weight(book1,heavy))).
-currentState(attr(obj_weight(cup1,light))).
-
-currentState(attr(surface(book1,hard))).
-currentState(attr(surface(cup1,brittle))).
-
+% Relational rule for inferred fluent (for determining location of held item)
 currentState(fluent(loc(O,L))) :- domain(sort(object(O))), currentState(fluent(in_hand(X,O))), domain(sort(entity(X))), currentState(fluent(loc(X,L))).
 
-%
-
+% Determining permissible static attributes
 valid(attr(type(L,T))) :- domain(sort(location(L))), member(T, [office, library, workshop]).
 valid(attr(role(P,R))) :- domain(sort(person(P))), member(R, [engineer, manager, sales]).
 valid(attr(arm_type(R,T))) :- domain(sort(robot(R))), member(T, [pneumatic, electromagnetic]).
 valid(attr(obj_weight(O,W))) :- domain(sort(object(O))), member(W, [light, heavy]).
 valid(attr(surface(O,S))) :- domain(sort(object(O))), member(S, [hard, brittle]). 
 
-% Permissible fluents
+% Determining permissible fluents
 valid(fluent(loc(X,Y))) :- domain(sort(thing(X))), domain(sort(location(Y))).
 valid(fluent(in_hand(E,O))) :- domain(sort(entity(E))), domain(sort(item(O))).
 valid(fluent(labelled(I,Bool))) :- domain(sort(item(I))), member(Bool, [true,false]).
 valid(fluent(item_status(O,S))) :- domain(sort(item(O))), member(S, [intact, damaged]).
 
-% Permissible actions
+% Determining permissible actions
 valid(action(pickup(R,O))) :- domain(sort(robot(R))), domain(sort(item(O))).
 valid(action(putdown(R,O))) :- domain(sort(robot(R))), domain(sort(item(O))).
 valid(action(move(R,L))) :- domain(sort(robot(R))), domain(sort(location(L))).
@@ -80,7 +72,36 @@ valid(action(serve(R,O,P))) :- domain(sort(robot(R))), domain(sort(item(O))), do
 valid(action(affix_label(R,O))) :- domain(sort(robot(R))), domain(sort(object(O))).
 valid(action(wait(R))) :- domain(sort(robot(R))).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Define additional permissible alternatives for domain tests.
+% The system already checks obvious general forms for this, e.g., it will find the substitution fluent(loc(x,y)) for fluent(loc(x,z)), but tests with different functors must be specified in the domain.
+% For example, in this domain the location fluents loc and in_hand are in a sense interchangeable.
+% Note 1: Any number of permitted_domain_test_alternatives may be specified.
+% Note 2: permitted_domain_test_alternatives may be specified for static attributes or fluents.
+% Note 3: Duplications of alternatives the system itself finds will be ignored.
+% Note 4: There is NO valid( ) requirement here, i.e., it can return bad values, such as in_hand(p0, rob1) or in_hand(book1, p0) for this domain.
+%			This predicate should never itself be directly used, and the parent 'get_all_alternative_domain_tests(Term, ReturnList)' which calls it should
+%			only be used to swap in and out literals, followed always by testing for 'stateConstraintsViolated' (and starting again if there is a problem).
+% Note 5: In fact, given the ways in which this functionality is used (error checking and noise addition), it is not particularly important if they it hazy, unfair, or has gaps.
+permitted_domain_test_alternatives(fluent(in_hand(_A, X)), [fluent(loc(X, rmwor)), fluent(loc(X, rmoff)), fluent(loc(X, rmlib))]).
+permitted_domain_test_alternatives(fluent(loc(X, _L)), [fluent(in_hand(p0, X)), fluent(in_hand(p1, X)), fluent(in_hand(p2, X)), fluent(in_hand(rob1, X))]).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% 2. Domain details %%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Starting attributes
+currentState(attr(type(rmwor,workshop))).
+currentState(attr(type(rmoff,office))).
+currentState(attr(type(rmlib,library))).
+currentState(attr(role(p0,engineer))).
+currentState(attr(role(p1,manager))).
+currentState(attr(role(p2,sales))).
+currentState(attr(arm_type(rob1,pneumatic))).
+currentState(attr(obj_weight(book1,heavy))).
+currentState(attr(obj_weight(cup1,light))).
+currentState(attr(surface(book1,hard))).
+currentState(attr(surface(cup1,brittle))).
 
 domain_specified_end :-	step(last), !.
 domain_specified_end :-	domainGoalAction(serve(rob1,book1,_)), ( currentState(fluent(in_hand(P,book1))), currentState(attr(person(P))) ), !.
@@ -88,53 +109,29 @@ domain_specified_end :-	domainGoalAction(pickup(rob1,X)), currentState(fluent(in
 domain_specified_end :- domainGoalAction(affix_label(rob1,X)), currentState(fluent(labelled(X,true))), !.
 domain_specified_end :-	stateConstraintsViolated.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+defaultNullAction([wait(rob1)]).
 
-% STATE CONSTRAINTS
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 3. State constraints %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% State constraints
 stateConstraintsViolated :- currentState(fluent(loc(O,L1))), currentState(fluent(loc(O,L2))), L1 \= L2. % One thing in two places
 stateConstraintsViolated :- currentState(fluent(in_hand(H1,O))), currentState(fluent(in_hand(H2,O))), H1 \= H2. % Anything simultaneously in two different hands
 stateConstraintsViolated :- currentState(fluent(in_hand(H,O1))), currentState(fluent(in_hand(H,O2))), O1 \= O2. % Same entity has two things in hand
 stateConstraintsViolated :- domain(sort(thing(E))), not(currentState(fluent(loc(E,_)))). % An entity or object not at a place
-
-% DEFINITE
 stateConstraintsViolated :- currentState(X), not(valid(X)).
 stateConstraintsViolated :- currentState(fluent(labelled(O,B1))), currentState(fluent(labelled(O,B2))), B1 \= B2. % Labelled and not labelled
 stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent(labelled(O,_)))). % No boolean value for a small object's labelled status
 stateConstraintsViolated :- currentState(fluent(item_status(O,B1))), currentState(fluent(item_status(O,B2))), B1 \= B2. % Damaged and intact
 stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent(item_status(O,_)))). % No value for a small object's item status
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-domain_test_alternatives(attr(type(X, workshop)), [attr(type(X, library)),attr(type(X, office))]).
-domain_test_alternatives(attr(type(X, library)), [attr(type(X, workshop)),attr(type(X, office))]).
-domain_test_alternatives(attr(type(X, office)), [attr(type(X, library)),attr(type(X, workshop))]).
-domain_test_alternatives(attr(arm_type(X, electromagnetic)), [attr(arm_type(X, pneumatic))]).
-domain_test_alternatives(attr(arm_type(X, pneumatic)), [attr(arm_type(X, electromagnetic))]).
 
-domain_test_alternatives(attr(role_type(P, sales)), [attr(role_type(P, engineer)), attr(role_type(P, manager))]).
-domain_test_alternatives(attr(role_type(P, engineer)), [attr(role_type(P, sales)), attr(role_type(P, manager))]).
-domain_test_alternatives(attr(role_type(P, manager)), [attr(role_type(P, sales)), attr(role_type(P, engineer))]).
 
-domain_test_alternatives(attr(obj_weight(X, heavy)), [attr(obj_weight(X, light))]).
-domain_test_alternatives(attr(obj_weight(X, light)), [attr(obj_weight(X, heavy))]).
-	
-domain_test_alternatives(attr(surface(X, brittle)), [attr(surface(X, hard))]).
-domain_test_alternatives(attr(surface(X, hard)), [attr(surface(X, brittle))]).
-	
-domain_test_alternatives(fluent(labelled(X,true)), [fluent(labelled(X,false))]) :- !.
-domain_test_alternatives(fluent(labelled(X,false)), [fluent(labelled(X,true))]) :- !.
-domain_test_alternatives(fluent(item_status(X,damaged)), [fluent(item_status(X,intact))]) :- !.
-domain_test_alternatives(fluent(item_status(X,intact)), [fluent(item_status(X,damaged))]) :- !.
 
-domain_test_alternatives(N, Return) :-
-	N = fluent(_),
-	select(N,
-	[fluent(loc(X, rmwor)), fluent(loc(X, rmoff)), fluent(loc(X, rmlib)), fluent(in_hand(p0, X)), fluent(in_hand(p1, X)), fluent(in_hand(p2, X)), fluent(in_hand(rob1, X))],
-	Return).
-% Note that this can return some bad values, such as in_hand(p0, rob1) or in_hand(book1, p0), but these functions are only used to swap in and out literals,
-% which is always followed by testing for 'stateConstraintsViolated' (and starting again if there is a problem).
 
-defaultNullAction([wait(rob1)]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -327,6 +324,10 @@ applyActionToStateFinal(Something) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 actionDescription(wait(Robot), [Robot], [robot]).
+
+% Causal law format:
+%   causal_law(Action, FluentsAndStaticsThatMustHold, Consequences).
+% Can have multiple causal laws per action.
 
 %
 actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location]).
