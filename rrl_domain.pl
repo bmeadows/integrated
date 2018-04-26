@@ -13,8 +13,8 @@
 % 1. Abstract domain description
 % 2. Domain details
 % 3. State constraints
-% 4. 
-% 5. 
+% 4. Oracle: Actual domain transitions
+% 5. Agent knowledge
 % 6. 
 % 7. 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -109,6 +109,7 @@ domain_specified_end :-	domainGoalAction(pickup(rob1,X)), currentState(fluent(in
 domain_specified_end :- domainGoalAction(affix_label(rob1,X)), currentState(fluent(labelled(X,true))), !.
 domain_specified_end :-	stateConstraintsViolated.
 
+% Nonaction for edge cases where no actions are possible, e.g., due to unusual consequences of noise
 defaultNullAction([wait(rob1)]).
 
 
@@ -128,44 +129,36 @@ stateConstraintsViolated :- currentState(fluent(item_status(O,B1))), currentStat
 stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent(item_status(O,_)))). % No value for a small object's item status
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%% 4. Oracle: Actual domain transitions %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-% % % ORACLE % % %
-
+% This function must be defined for the system to perform simulation.
 applyActionToState(Action) :-
 	step(I),
 	% 1. Update time
 	retractall(step(I)),
-	(I == 6 -> J = last ; J is I + 1),
+	(I == 6 -> J = last ; J is I + 1), % Domain has maximum six steps in an episode
 	assert(step(J)),
 	% 2. Apply action
-	applyActionToStateFinal(Action),
+	applyActionToState_SingleCase(Action),
 	applyNoiseWhereAppropriate.
 	% 3. Move people who had been about to move
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-applyActionToStateFinal(move(Robot, Loc)) :-
+applyActionToState_SingleCase(move(Robot, Loc)) :-
 	currentState(fluent(in_hand(Robot, O))),
 	retract_facts_only(	currentState(fluent(loc(O,_)))), % May or may not be overt
 	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
-applyActionToStateFinal(move(Robot, Loc)) :-
+applyActionToState_SingleCase(move(Robot, Loc)) :-
 	not(currentState(fluent(in_hand(Robot, _)))),
 	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %%(8) "An item with a brittle surface cannot be labelled by a robot, UNLESS item is heavy and robot has electromagnetic arm." [positive affordance]
-applyActionToStateFinal(affix_label(R, Obj)) :-
+applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
 	currentState(attr(surface(Obj, brittle))),
@@ -179,18 +172,18 @@ applyActionToStateFinal(affix_label(R, Obj)) :-
 	!.
 
 %%(5) "An item with a brittle surface cannot be labelled by a robot." [executability condition]
-applyActionToStateFinal(affix_label(_R, Obj)) :-
+applyActionToState_SingleCase(affix_label(_R, Obj)) :-
 	currentState(attr(surface(Obj, brittle))),
 	!.
 
 %%(6) "An item with item_status 'damaged' cannot be labelled by a robot with a pneumatic arm." [negative affordance]
-applyActionToStateFinal(affix_label(R, Obj)) :-
+applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(item_status(Obj, damaged))),
 	currentState(attr(arm_type(R, pneumatic))),
 	!.
 
 %%(7) labelling a light object with a pneumatic arm causes it to be damaged [causal law]
-applyActionToStateFinal(affix_label(R, Obj)) :-
+applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
 	currentState(attr(arm_type(R, pneumatic))),
@@ -203,7 +196,7 @@ applyActionToStateFinal(affix_label(R, Obj)) :-
 	!.
 
 % Succeeded label affix
-applyActionToStateFinal(affix_label(R, Obj)) :-
+applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(attr(surface(Obj, hard))),
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
@@ -212,16 +205,14 @@ applyActionToStateFinal(affix_label(R, Obj)) :-
 	assert(currentState(fluent(labelled(Obj, true)))),
 	!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 %%(3) A robot with a pneumatic arm cannot serve a brittle object [negative affordance]
-applyActionToStateFinal(serve(R, Obj, _P)) :-
+applyActionToState_SingleCase(serve(R, Obj, _P)) :-
 	currentState(attr(surface(Obj, brittle))),
 	currentState(attr(arm_type(R, pneumatic))),
 	!.
 
 %%(4) "Item cannot be served if damaged, except to an engineer, UNLESS item is labelled." [positive affordance]
-applyActionToStateFinal(serve(R, Obj, P)) :-
+applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(item_status(Obj, damaged))),
 	not(currentState(attr(role_type(P, engineer)))),
 	% Affordance: Labelled
@@ -235,16 +226,16 @@ applyActionToStateFinal(serve(R, Obj, P)) :-
 	assert(currentState(fluent(in_hand(P, Obj)))),
 	% Note that this exception doesn't result in the causal law 'serve unlabelled object to salesperson makes it labelled' applying, because it requires the object already be labelled.
 	% However, in general be careful.
-	% Speculation: Should move to a more ASP-like distributed representation for causal laws, which would resolve this.
+	% Suggestion: Should move to a more ASP-like distributed representation for causal laws, which would resolve this.
 	!.
 
 %%(2) "Item cannot be served if damaged, except to an engineer." [executability condition]
-applyActionToStateFinal(serve(_R, Obj, P)) :-
+applyActionToState_SingleCase(serve(_R, Obj, P)) :-
 	currentState(fluent(item_status(Obj, damaged))),
 	not(currentState(attr(role_type(P, engineer)))),
 	!.
 %%(1) "Serving an object to a salesperson causes it to be labelled." [causal law]
-applyActionToStateFinal(serve(R, Obj, P)) :-
+applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(attr(role_type(P, sales))),
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(P, Loc))),
@@ -257,7 +248,7 @@ applyActionToStateFinal(serve(R, Obj, P)) :-
 	!.
 	
 % Succeeded serve: none of the above cases applied
-applyActionToStateFinal(serve(R, Obj, P)) :-
+applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(P, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
@@ -267,16 +258,14 @@ applyActionToStateFinal(serve(R, Obj, P)) :-
 	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of things like exogenous events, e.g., the object is served and then the person moves
 	!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % "Can't pick up a heavy object with a weak arm."
-applyActionToStateFinal(pickup(R, Obj)) :-
+applyActionToState_SingleCase(pickup(R, Obj)) :-
 	currentState(attr(obj_weight(Obj, heavy))),
 	currentState(attr(arm_type(R, electromagnetic))),
 	!.
 
 % Succeeded pickup: none of the above cases applied
-applyActionToStateFinal(pickup(R, Obj)) :-
+applyActionToState_SingleCase(pickup(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
 	not(currentState(fluent(in_hand(_, Obj)))),
@@ -284,10 +273,8 @@ applyActionToStateFinal(pickup(R, Obj)) :-
 	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of things like exogenous events (e.g., it's served and then the person moves)
 	!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Breaking a brittle object by putting it down
-applyActionToStateFinal(putdown(R, Obj)) :-
+applyActionToState_SingleCase(putdown(R, Obj)) :-
 	currentState(attr(surface(Obj, brittle))),
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
@@ -298,34 +285,33 @@ applyActionToStateFinal(putdown(R, Obj)) :-
 	!.
 
 % Succeeded putdown
-applyActionToStateFinal(putdown(R, Obj)) :-
+applyActionToState_SingleCase(putdown(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
 	assert(currentState(fluent(loc(Obj, Loc)))),
 	retract(currentState(fluent(in_hand(R, Obj)))),
 	!.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+applyActionToState_SingleCase(wait(_)) :- !.
 
-applyActionToStateFinal(wait(_)) :- !.
-
-applyActionToStateFinal(Something) :-
+applyActionToState_SingleCase(X) :-
 	writef('Note: Unexpected oracle failure.\n'),
-	writef(Something), nl,
+	writef(X), nl,
 	noiseChancePercent(Noise), % Noise is likely to blame, because it can set up impossible situations - ignore it
 	((Noise > 0) -> true ; trace).
-	
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% 5. Agent knowledge %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Define the axioms comprising the agent's domain knowledge. Consists of:
+% actionDescription/3,	fact, arguments: action term, ordered list of action arguments, ordered list of valid types for those arguments;
+% causal_law/3,			fact, arguments: action term, list of fluent and static conditions, list of fluent consequences;
+% impossible_if/2,		rule, arguments: action term, unique numeric ID for condition... rule body contains necessary conditions for rule to fire and thus action to fail.
+% Each action should have one action description, any number of causal laws, and any number of executability conditions (impossible_if).
 
 actionDescription(wait(Robot), [Robot], [robot]).
-
-% Causal law format:
-%   causal_law(Action, FluentsAndStaticsThatMustHold, Consequences).
-% Can have multiple causal laws per action.
 
 %
 actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location]).
@@ -349,7 +335,7 @@ impossible_if(putdown(Robot, Object), 20) :-
 actionDescription(serve(Robot, Object, Person), [Robot, Object, Person], [robot, item, person]).
 causal_law(serve(Robot, Object, Person), [], [fluent(in_hand(Person, Object)), not(fluent(in_hand(Robot, Object)))]).
 causal_law(serve(_Robot, Object, Person), [attr(role_type(Person, sales)), fluent(labelled(Object,false))], [not(fluent(labelled(Object, false))), fluent(labelled(Object,true))]). % Causal law elided for test #1
-% Causal laws don't need to overtly retract Object being at its Location because that should already only be derived.
+% Causal laws do not need to overtly retract derived fluents, e.g. Object being at its holder's Location.
 impossible_if(serve(Robot, _Object, Person), 30) :-
 	not((	currentState(fluent(loc(Robot, Location))),
 			currentState(fluent(loc(Person, Location))) )).
