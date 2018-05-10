@@ -2476,14 +2476,15 @@ get_all_alternative_domain_tests(Term, ReturnList) :-
 	sort(FlatList, ReturnList),
 	(ReturnList == [] -> (writef('Error: get_all_alternative_domain_tests failed due to bad argument.'), trace) ; true).
 
-% Note that for fluents specifically, looser in terms of sharing a single argument in a single position.
-% e.g. loc(x,y) will substitute both for loc(w,y) and loc(x,z)!
+% Note that to avoid complications, e.g. loc(x,y) will only substitute for loc(x,z), not loc(w,y)!
+% Anything else must be set up within the domain using permitted_domain_test_alternatives/2.
 permitted_domain_test_alternatives(fluent(ContentTerm), ReturnList) :-
 	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
 	SomeNumberOfArgs > 1,
+	arg(1, ContentTerm, FirstArg),
 	!,
-	findall(	N, % Find all static attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
-				(functor(N2, ContentPred, SomeNumberOfArgs), arg(SomeInt, ContentTerm, FirstArg), arg(SomeInt, N2, FirstArg), N = fluent(N2), valid(N), N2 \= ContentTerm),
+	findall(	N, % Find all fluent attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
+				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = fluent(N2), valid(N), N2 \= ContentTerm),
 				ReturnList
 	).
 permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
@@ -2495,3 +2496,4 @@ permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
 				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = attr(N2), valid(N), N2 \= ContentTerm),
 				ReturnList
 	).
+

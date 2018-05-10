@@ -124,9 +124,9 @@ stateConstraintsViolated :- currentState(fluent(in_hand(H,O1))), currentState(fl
 stateConstraintsViolated :- domain(sort(thing(E))), not(currentState(fluent(loc(E,_)))). % An entity or object not at a place
 stateConstraintsViolated :- currentState(X), not(valid(X)).
 stateConstraintsViolated :- currentState(fluent(labelled(O,B1))), currentState(fluent(labelled(O,B2))), B1 \= B2. % Labelled and not labelled
-stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent(labelled(O,_)))). % No boolean value for a small object's labelled status
+stateConstraintsViolated :- domain(sort(item(O))), not(currentState(fluent(labelled(O,_)))). % No boolean value for a small object's labelled status
 stateConstraintsViolated :- currentState(fluent(item_status(O,B1))), currentState(fluent(item_status(O,B2))), B1 \= B2. % Damaged and intact
-stateConstraintsViolated :- currentState(attr(item(O))), not(currentState(fluent(item_status(O,_)))). % No value for a small object's item status
+stateConstraintsViolated :- domain(sort(item(O))), not(currentState(fluent(item_status(O,_)))). % No value for a small object's item status
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -296,7 +296,7 @@ applyActionToState_SingleCase(wait(_)) :- !.
 
 applyActionToState_SingleCase(X) :-
 	writef('Note: Unexpected oracle failure.\n'),
-	writef(X), nl,
+	print(X), nl,
 	noiseChancePercent(Noise), % Noise is likely to blame, because it can set up impossible situations - ignore it
 	((Noise > 0) -> true ; trace).
 
