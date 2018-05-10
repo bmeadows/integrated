@@ -1076,7 +1076,7 @@ liftCandidates :-
 	final_axiom(Rank, unexpected(Action), [Yes,No], AdjustedMean, Worst, Count, Configs),
 	!,
 	unexpectedResult(Effects),
-	lift_lists_to_strings([[Action],Yes,No,Effects], [[Action2],Yes2,No2,Effects2]),
+	lift_lists_representing_rules_to_strings([[Action],Yes,No,Effects], [[Action2],Yes2,No2,Effects2]),
 	create_negation_strings(No2,Neg),
 	create_comma_separated_strings(Neg,Negs),
 	create_comma_separated_strings(Yes2,Pos),
@@ -1096,7 +1096,7 @@ liftCandidates :-
 	learning_type(executability_condition_learning),
 	final_axiom(Rank, unexpected(Action), [Yes,No], AdjustedMean, Worst, Count, Configs),
 	!,
-	lift_lists_to_strings([[Action],Yes,No], [[Action2],Yes2,No2]),
+	lift_lists_representing_rules_to_strings([[Action],Yes,No], [[Action2],Yes2,No2]),
 	create_negation_strings(No2,Neg),
 	create_comma_separated_strings(Neg,Negs),
 	create_comma_separated_strings(Yes2,Pos),
@@ -1113,7 +1113,7 @@ liftCandidates :-
 	learning_type(negative_affordance_learning),
 	final_axiom(Rank, unexpected(Action), [Yes,No], AdjustedMean, Worst, Count, Configs),
 	!,
-	lift_lists_to_strings([[Action],Yes,No], [[Action2],Yes2,No2]),
+	lift_lists_representing_rules_to_strings([[Action],Yes,No], [[Action2],Yes2,No2]),
 	create_negation_strings(No2,Neg),
 	create_comma_separated_strings(Neg,Negs),
 	create_comma_separated_strings(Yes2,Pos),
@@ -1133,7 +1133,7 @@ liftCandidates :-
 	executabilityConditionViolated(ID),
 	clause(impossible_if(Action, ID), TailTerm),
 	round_bracketed_term_to_list(TailTerm, ExCondList),
-	lift_lists_to_strings([[Action],Yes,No,ExCondList], [[Action2],Yes2,No2,ExCondList2]),
+	lift_lists_representing_rules_to_strings([[Action],Yes,No,ExCondList], [[Action2],Yes2,No2,ExCondList2]),
 	create_negation_strings(No2,Neg),
 	create_comma_separated_strings(Neg,Negs),
 	create_comma_separated_strings(Yes2,Pos),
@@ -1191,26 +1191,50 @@ create_comma_separated_strings_recursive([A|B],CurrentString,Final) :-
 	concat(CurrentString, ', ', Next),
 	concat(Next, A, Next2),
 	create_comma_separated_strings_recursive(B,Next2,Final).
-	
+
+
 % InputListOfNListsOfTerms    : an arbitrary list of sublists, each sublist containing an arbitrary number of terms
 % OutputListOfNListsOfStrings : a list of sublists following the same structure, each sublist containing terms translated into strings
-lift_lists_to_strings(InputListOfNListsOfTerms, OutputListOfNListsOfStrings) :-
-	recurse_lift_lists(InputListOfNListsOfTerms, [], OutputListOfNListsOfStrings).
+%
+% Variablisation: There is the question of identifying constant terms to lift.
+% "Lift terms shared between the head and the body" fails, e.g., topple(towerx) :- on(x,y), on(y,z)...
+% "Lift terms repeated within the body" fails, e.g., something :- labelled(x,true), labelled(y,true)...
+% "Lift terms that are sorts of (objects in) the domain and appear more than once in the entire rule" should work, but will need to be adjusted in a more ASP-like setting.
+%
+% Consider re-implementing with sub_atom/5.
+lift_lists_representing_rules_to_strings(InputListOfNListsOfTerms, OutputListOfNListsOfStrings) :-
+	find_list_of_consts_to_replace(InputListOfNListsOfTerms, TargetDomainConsts),
+	recurse_lift_lists_representing_rules(InputListOfNListsOfTerms, TargetDomainConsts, [], OutputListOfNListsOfStrings).
 
-recurse_lift_lists([], OutputListOfNListsOfStrings, OutputListOfNListsOfStrings).
-recurse_lift_lists([A|B], Current, OutputListOfNListsOfStrings) :-
-	recurse_lift_strings_in_list(A,[],A2),
-	recurse_lift_lists(B, [A2|Current], OutputListOfNListsOfStrings).
+% TargetDomainConsts are those that should be lifted in the final form (other terms should be left)
+find_list_of_consts_to_replace(ListOfNListsOfTerms, TargetDomainConsts) :-
+	flatten(ListOfNListsOfTerms, ListOfTerms),
+	extract_constants_list(ListOfTerms, [], ListOfConsts),
+	sort(ListOfConsts, UniqueListOfConsts),
+	findall(X, (member(X, UniqueListOfConsts), member_in_domain(X, ListOfConsts)), TargetDomainConsts).
 
-recurse_lift_strings_in_list([],Return,Return).
-recurse_lift_strings_in_list([A|B],Current,Return) :-
-	term_string(A, AString),
-	lift_term_to_string(AString, A2),
-	recurse_lift_strings_in_list(B,[A2|Current],Return).
+member_in_domain(ObjectConstantSymbol, List) :-
+	% 1. Must be a domain sort
+	domain(sort(Term)),
+	arg(1, Term, ObjectConstantSymbol),
+	% 2. Must appear more than once in the rule, i.e., the original list
+	nth1(Index1, List, ObjectConstantSymbol),
+	nth1(Index2, List, ObjectConstantSymbol),
+	Index1 \= Index2,
+	% Cut if true
+	!.
+  
+extract_constants_list([], Return, Return).
+extract_constants_list([Term|TermsTail], RunningListOfConsts, FinalListOfConsts) :-
+	term_string(Term, TermString),
+	lift_term_to_string_list(TermString, ReturnString),
+	term_string(StringList, ReturnString),
+	append(StringList, RunningListOfConsts, NewListOfConsts),
+	extract_constants_list(TermsTail, NewListOfConsts, FinalListOfConsts).
 
-% Find last '('; apply string_upper to substring following that.
-% If no '(', return.
-lift_term_to_string(InString, OutString) :-
+% Find final '('; return substring between that and next ')' within square brackets.
+% If no '(', return entirety within square brackets.
+lift_term_to_string_list(InString, OutString) :-
 	sub_string(InString, _, 1, _, "("), % Has at least one open round bracket
 	!,
 	findall(CharsBefore,
@@ -1218,12 +1242,45 @@ lift_term_to_string(InString, OutString) :-
 		ListOfSubStrings),
 	member(Before, ListOfSubStrings),
 	not(( member(Bef2, ListOfSubStrings), Bef2 > Before)), % No opening bracket comes later than this one (necessary in case of nested brackets)
-	sub_string(InString, Before, _Length, 0, SubString),
-	string_upper(SubString, SUBSTR),
-	sub_string(InString, 0, Before, _After, Start),
-	concat(Start, SUBSTR, OutString).
-lift_term_to_string(InString, OutString) :-
-	concat(InString, "", OutString).
+	Before2 is Before +1,
+	sub_string(InString, Before2, _Length, 0, SubString),
+	split_string(SubString, ")", "", [NewSubString|_]), % Get only part before first closing bracket
+	concat("[", NewSubString, String2),
+	concat(String2, "]", OutString).
+lift_term_to_string_list(InString, OutString) :-
+	concat("[", InString, String2),
+	concat(String2, "]", OutString).
+
+recurse_lift_lists_representing_rules([], _, OutputListOfNListsOfStrings, OutputListOfNListsOfStrings).
+recurse_lift_lists_representing_rules([A|B], TargetConsts, Current, OutputListOfNListsOfStrings) :-
+	recurse_lift_strings_in_list(A,TargetConsts,[],A2),
+	append(Current,[A2],NewL),
+	recurse_lift_lists_representing_rules(B, TargetConsts, NewL, OutputListOfNListsOfStrings).
+
+recurse_lift_strings_in_list([],_,Return,Return).
+recurse_lift_strings_in_list([A|B],TargetConsts,Current,Return) :-
+	term_string(A, AString),
+	lift_term_if_in_list(AString, TargetConsts, A2),
+	append(Current,[A2],NewL),
+	recurse_lift_strings_in_list(B,TargetConsts,NewL,Return).
+
+lift_term_if_in_list(OutString, [], OutString) :- !.
+lift_term_if_in_list(WorkingString, [TargetConst|OtherTargetConsts], OutString) :-
+	string_upper(TargetConst, TargetConst_UPPER),
+	% Replace all instances of TargetConst in WorkingString with TargetConst_UPPER
+	replace_all_instances_in_string(TargetConst, TargetConst_UPPER, WorkingString, NewWorkingString),
+	lift_term_if_in_list(NewWorkingString, OtherTargetConsts, OutString).
+
+replace_all_instances_in_string(TargetConst, TargetConst_UPPER, WorkingString, Return) :-
+	sub_string(WorkingString, CharsBefore, SubstringLength, _CharsAfter, TargetConst),
+	!,
+	sub_string(WorkingString, 0, CharsBefore, _After, StartSubstring),
+	concat(StartSubstring, TargetConst_UPPER, MiddleSubstring),
+	MidLength is CharsBefore + SubstringLength,
+	sub_string(WorkingString, MidLength, _Length, 0, EndSubstring),
+	concat(MiddleSubstring, EndSubstring, New),	
+	replace_all_instances_in_string(TargetConst, TargetConst_UPPER, New, Return).
+replace_all_instances_in_string(_, _, X, X) :- !.
 
 adjustAxiomsWithMean :-
 	not(candidate_axiom(raw,_,[_,_],_,_,_,_)),
