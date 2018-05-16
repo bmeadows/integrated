@@ -5,7 +5,7 @@
  * Description: This file contains functions that reduce a search space to the relevant space for q-RRL and provides other supporting functionality.
  */
 
-:- dynamic goalState/1, precalculate/0.
+:- dynamic goalState/1, precalculate/0, step/1.
 
 relevantTestLiteral(Lit) :-
 	relevantTestLitAction(Lit).
@@ -348,6 +348,19 @@ sortsHoldTrue([Sort|Tail1], [Var|Tail2]) :-
 	domain(sort(Term)),
 	sortsHoldTrue(Tail1, Tail2).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+applyActionToState(Action) :-
+	step(I),
+	% 1. Update time
+	retractall(step(I)),
+	max_step(Max),
+	(I == Max -> J = last ; J is I + 1), % Domain has maximum number of steps per episode
+	assert(step(J)),
+	% 2. Apply action
+	applyActionToState_SingleCase(Action),
+	applyNoiseWhereAppropriate.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

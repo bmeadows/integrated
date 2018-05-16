@@ -71,6 +71,10 @@ convergence_buffer(50).
 % Takes any positive integer.
 maximum_episode_limit(200).
 
+% Number of time steps in a single episodic learning sequence for the domain.
+% Takes any positive integer. 5 was observed to be a reasonable value for Blocks World.
+max_step(5).
+
 % The minimum number of configurations to explore.
 % 40 was observed to be a reasonable value for Blocks World.
 minimum_number_of_searches(40).
@@ -132,3 +136,8 @@ number_of_filters(10).
 % The system only supports closed-world relational learning.
 closed_world(true).
 rrl(true).
+
+
+
+
+

@@ -5,7 +5,6 @@
  * Description: This file encodes a domain intended for learning with q-RRL.
  */
 
-:- dynamic step/1.
 :- discontiguous actionDescription/3, impossible_if/2, causal_law/3, currentState/1.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -133,17 +132,7 @@ stateConstraintsViolated :- domain(sort(item(O))), not(currentState(fluent(item_
 %%%%% 4. Oracle: Actual domain transitions %%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% This function must be defined for the system to perform simulation.
-applyActionToState(Action) :-
-	step(I),
-	% 1. Update time
-	retractall(step(I)),
-	(I == 6 -> J = last ; J is I + 1), % Domain has maximum six steps in an episode
-	assert(step(J)),
-	% 2. Apply action
-	applyActionToState_SingleCase(Action),
-	applyNoiseWhereAppropriate.
-	% 3. Move people who had been about to move
+% Clauses of this function must be appropriately defined for the system to perform simulation.
 
 applyActionToState_SingleCase(move(Robot, Loc)) :-
 	currentState(fluent(in_hand(Robot, O))),
@@ -413,6 +402,7 @@ resetStateAtRandom :-
 	setupFluentsRandomly,
 	!.
 
+% Do not call when a fluent configuration already exists.
 setupFluentsRandomly :-
 	% 1. Do entity locations independently
 	setupEntityL(rob1), setupEntityL(p0), setupEntityL(p1), setupEntityL(p2),
