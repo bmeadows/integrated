@@ -1647,12 +1647,14 @@ batchReportingTime.
 
 key_registers_report(Stream) :-
 	register(b1, Stored1, -1), % BDT building
-	write(Stream, '\n(1) '),
+	write(Stream, 'b '),
 	write(Stream, Stored1),
+	write(Stream, '\n'),
 	% (precalculation step shouldn't change, and might be omitted from batch runs)
 	register(g1, Stored3, -1), % Generalisation
-	write(Stream, '\n(3) '),
+	write(Stream, 'g '),
 	write(Stream, Stored3),
+	write(Stream, '\n'),
 	!.
 key_registers_report(_) :- trace. % Catastrophic failure in batch testing.
 
