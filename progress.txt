@@ -7,11 +7,16 @@
 04. Extracted all parameters from main program and added documentation for them.
 05. Extracted parameters for episode limit, convergence buffer, and exploration before splitting.
 06. Removed deprecated code involving parsimony.
-07. Replaced multiple overlapping output formats with silent/quiet/verbose calls.
-08. Updated axiom lifting with better variablisation and consistent formatting of output axioms as strings.
+07. Replaced multiple overlapping output formats with silent/quiet/verbose calls. Corrected other formatting and print errors.
+08. Updated axiom lifting with better variablisation (accurately lifting only common variables that are recognised domain objects) and consistent formatting of output axioms as strings.
 09. Corrected domain errors.
 10. Made registered CPU time information print to the correct output stream.
 11. Added consistent file headers.
 12. Removed deprecated comments and documentation for prior versions.
 13. Added documentation for data_collector.pl, rrl_d.
 14. Replaced 'domain_test_alternatives' predicate functionality in domain with equivalent system-level functionality and option for domain to add additional cases.
+15. Fixed setting a random fluent configuration.
+16. Fixed issues with finding permitted alternatives to domain BDT tests, and corresponding problems with example domain.
+19. Parameterised number of steps in a domain sequence and changed step checking from domain defined to system functionality.
+20. Parameterised function for changing an observed failure state to a semi-random permutation.
+21. Fixed data collector to depend on parameterised number of filters.

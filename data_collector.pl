@@ -62,8 +62,11 @@ matchesWithOverfitting(Y1,N1) :-
 % Send results to 'post_analysis.txt'
 printResult :-
 	open('post_analysis.txt', write, Stream),
-	printEach(0,11,Stream),
-	close('post_analysis.txt').
+	write(Stream, 'Filter #: Overspecifications, False positives\n'),
+	number_of_filters(N),
+	N2 is N+1,
+	printEach(0,N2,Stream),
+	close(Stream).
 
 printEach(Current,Current,_) :- !.
 printEach(Current,Finish,Stream) :-
