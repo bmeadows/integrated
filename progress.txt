@@ -20,3 +20,5 @@
 19. Parameterised number of steps in a domain sequence and changed step checking from domain defined to system functionality.
 20. Parameterised function for changing an observed failure state to a semi-random permutation.
 21. Fixed data collector to depend on parameterised number of filters.
+22. Data collector now collates data on true positives from batch trials.
+23. Data collector now collates data on time taken during batch trials.

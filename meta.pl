@@ -133,13 +133,24 @@ retracteachfromstate([A|B]) :- retract_facts_only(currentState(A)), retracteachf
 
 resetStateInPrincipledWay :-
 	setObservedUnexpectedState,
-	random(R1),
-	random(R2),
-	(R1<0.5 -> makeSingleFluentChange ; true),
-	(R2<0.1 -> makeSingleFluentChange ; true),
+	permuteStateSemiRandomly,
 	!,
 	(stateConstraintsViolated -> resetStateInPrincipledWay ; true).
 	
+% Change an observed failure state to a semi-random permutation.
+% Note this can cause bad states; must check for violations after calling.
+permuteStateSemiRandomly :-
+	fluent_change_iterations(N),
+	fluent_change_chance(P),
+	permuteStateSemiRandomlyIterate(N,P).
+	
+permuteStateSemiRandomlyIterate(0,_) :- !.
+permuteStateSemiRandomlyIterate(N,P) :-
+	random(R),
+	(R < P -> makeSingleFluentChange ; true),
+	N2 is N-1,
+	permuteStateSemiRandomlyIterate(N2,P).
+
 makeSingleFluentChange :- 
 	% Select a random fluent currentState(fluent(f)), then call swapOut(fluent(f))
 	findall(F, (currentState_overt_belief_only(F), F=fluent(_)), List), % Just currentState() will go wrong because of inferred beliefs not actively believed

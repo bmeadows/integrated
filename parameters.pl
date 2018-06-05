@@ -75,6 +75,14 @@ maximum_episode_limit(200).
 % Takes any positive integer. 5 was observed to be a reasonable value for Blocks World.
 max_step(5).
 
+% When producing a semi-random permutation of an observed unexpected state, sets the maximum possible number of fluent changes.
+% Takes any positive integer.
+fluent_change_iterations(3).
+
+% When producing a semi-random permutation of an observed unexpected state, sets the chance that each possible fluent change will occur.
+% Takes any positive integer.
+fluent_change_chance(0.25).
+
 % The minimum number of configurations to explore.
 % 40 was observed to be a reasonable value for Blocks World.
 minimum_number_of_searches(40).

@@ -29,4 +29,5 @@ To begin learning, enter run(filename), specifying the file to send final output
 
 A batch processing interface is available using runbatch('counterFilename', 'errorFilename', 'timeFilename') in an analogous way.
 This command can be run multiple times updating the run data that is stored in the output files each time. An example of this for Windows operating systems is given in the file 'scriptrrl.bat'.
-Batch processing uses the batch_collect_data function in the supporting file 'data_collector.pl' to analyse information on false positives over extended trials, printing results to the file 'post_analysis.txt'.
+Batch processing uses the batch_collect_data function in the supporting file 'data_collector.pl' to analyse information on true positives, false positives, and time over extended trials.
+The collated results are printed to the file 'post_analysis.txt'.
