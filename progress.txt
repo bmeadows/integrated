@@ -9,12 +9,12 @@
 06. Removed deprecated code involving parsimony.
 07. Replaced multiple overlapping output formats with silent/quiet/verbose calls. Corrected other formatting and print errors.
 08. Updated axiom lifting with better variablisation (accurately lifting only common variables that are recognised domain objects) and consistent formatting of output axioms as strings.
-09. Corrected domain errors.
+09. Corrected various example domain errors.
 10. Made registered CPU time information print to the correct output stream.
 11. Added consistent file headers.
 12. Removed deprecated comments and documentation for prior versions.
 13. Added documentation for data_collector.pl, rrl_d.
-14. Replaced 'domain_test_alternatives' predicate functionality in domain with equivalent system-level functionality and option for domain to add additional cases.
+14. Replaced 'domain_test_alternatives' predicate functionality in example domain with equivalent system-level functionality and option for domain to add additional cases.
 15. Fixed setting a random fluent configuration.
 16. Fixed issues with finding permitted alternatives to domain BDT tests, and corresponding problems with example domain.
 19. Parameterised number of steps in a domain sequence and changed step checking from domain defined to system functionality.
@@ -22,3 +22,7 @@
 21. Fixed data collector to depend on parameterised number of filters.
 22. Data collector now collates data on true positives from batch trials.
 23. Data collector now collates data on time taken during batch trials.
+24. Data collector now identifies three types of false positive ('overfitting' overspecificity, 'subset negation' overspecificity, and other) and reports them individually.
+25. Fixed an example domain error giving the symbol 'role_type' as 'role'.
+26. Fixed an example domain error conflating symbols p0 and p1.
+27. Updated example domain for affordance learning.

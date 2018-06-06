@@ -36,7 +36,7 @@ random_seed(false).
 
 % Main parameter to vary.
 % Percentage of the (possibly reduced) space of object configurations to explore.
-percent_of_object_config_space_to_search(3).
+percent_of_object_config_space_to_search(10).
 
 % Specify the type of learning to perform.
 % Options: executability_condition_learning, causal_law_learning, positive_affordance_learning, negative_affordance_learning.

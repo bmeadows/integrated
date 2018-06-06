@@ -43,7 +43,7 @@ domain(sort(location(rmwor))).
 domain(sort(location(rmoff))).
 domain(sort(location(rmlib))).
 domain(sort(book(book1))).
-domain(sort(book(cup1))).
+domain(sort(cup(cup1))).
 %
 domain(sort(Term1)) :- subsort(General,Specific), functor(Term1,General,1), arg(1,Term1,Arg), functor(Term2,Specific,1), arg(1,Term2,Arg), domain(sort(Term2)).
 
@@ -52,7 +52,7 @@ currentState(fluent(loc(O,L))) :- domain(sort(object(O))), currentState(fluent(i
 
 % Determining permissible static attributes
 valid(attr(type(L,T))) :- domain(sort(location(L))), member(T, [office, library, workshop]).
-valid(attr(role(P,R))) :- domain(sort(person(P))), member(R, [engineer, manager, sales]).
+valid(attr(role_type(P,R))) :- domain(sort(person(P))), member(R, [engineer, manager, sales]).
 valid(attr(arm_type(R,T))) :- domain(sort(robot(R))), member(T, [pneumatic, electromagnetic]).
 valid(attr(obj_weight(O,W))) :- domain(sort(object(O))), member(W, [light, heavy]).
 valid(attr(surface(O,S))) :- domain(sort(object(O))), member(S, [hard, brittle]). 
@@ -93,9 +93,9 @@ permitted_domain_test_alternatives(fluent(loc(X, _L)), [fluent(in_hand(p0, X)), 
 currentState(attr(type(rmwor,workshop))).
 currentState(attr(type(rmoff,office))).
 currentState(attr(type(rmlib,library))).
-currentState(attr(role(p0,engineer))).
-currentState(attr(role(p1,manager))).
-currentState(attr(role(p2,sales))).
+currentState(attr(role_type(p0,engineer))).
+currentState(attr(role_type(p1,manager))).
+currentState(attr(role_type(p2,sales))).
 currentState(attr(arm_type(rob1,pneumatic))).
 currentState(attr(obj_weight(book1,heavy))).
 currentState(attr(obj_weight(cup1,light))).
@@ -136,16 +136,18 @@ stateConstraintsViolated :- domain(sort(item(O))), not(currentState(fluent(item_
 
 applyActionToState_SingleCase(move(Robot, Loc)) :-
 	currentState(fluent(in_hand(Robot, O))),
-	retract_facts_only(	currentState(fluent(loc(O,_)))), % May or may not be overt
-	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
+	retract_facts_only(currentState(fluent(loc(O,_)))), % May or may not be overt
+	retract_facts_only(currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 applyActionToState_SingleCase(move(Robot, Loc)) :-
 	not(currentState(fluent(in_hand(Robot, _)))),
-	retract_facts_only(	currentState(fluent(loc(Robot,_)))),
+	retract_facts_only(currentState(fluent(loc(Robot,_)))),
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 
+% Uncomment to learn the positive affordance. Having this prevents the executability condition it is based on being learned.
+/*
 %%(8) "An item with a brittle surface cannot be labelled by a robot, UNLESS item is heavy and robot has electromagnetic arm." [positive affordance]
 applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
@@ -156,9 +158,10 @@ applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(attr(obj_weight(Obj, heavy))),
 	%
 	currentState(fluent(labelled(Obj, false))),
-	retract(currentState(fluent(labelled(Obj, false)))),
+	retract_facts_only(currentState(fluent(labelled(Obj, false)))),
 	assert(currentState(fluent(labelled(Obj, true)))),
 	!.
+*/
 
 %%(5) "An item with a brittle surface cannot be labelled by a robot." [executability condition]
 applyActionToState_SingleCase(affix_label(_R, Obj)) :-
@@ -178,9 +181,9 @@ applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(attr(arm_type(R, pneumatic))),
 	currentState(attr(obj_weight(Obj, light))),
 	%
-	retractall(currentState(fluent(labelled(Obj, false)))),
+	retract_facts_only(currentState(fluent(labelled(Obj, false)))),
 	assert(currentState(fluent(labelled(Obj, true)))),
-	retractall(currentState(fluent(item_status(Obj, _)))),
+	retract_facts_only(currentState(fluent(item_status(Obj, _)))),
 	assert(currentState(fluent(item_status(Obj, damaged)))),
 	!.
 
@@ -190,7 +193,7 @@ applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
 	currentState(fluent(labelled(Obj, false))),
-	retract(currentState(fluent(labelled(Obj, false)))),
+	retract_facts_only(currentState(fluent(labelled(Obj, false)))),
 	assert(currentState(fluent(labelled(Obj, true)))),
 	!.
 
@@ -200,6 +203,8 @@ applyActionToState_SingleCase(serve(R, Obj, _P)) :-
 	currentState(attr(arm_type(R, pneumatic))),
 	!.
 
+% Uncomment to learn the positive affordance. Having this prevents the executability condition it is based on being learned.
+/*
 %%(4) "Item cannot be served if damaged, except to an engineer, UNLESS item is labelled." [positive affordance]
 applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(item_status(Obj, damaged))),
@@ -211,12 +216,13 @@ applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(loc(P, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
 	not(currentState(fluent(in_hand(P, _)))),
-	retract(currentState(fluent(in_hand(R, Obj)))),
+	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
 	assert(currentState(fluent(in_hand(P, Obj)))),
 	% Note that this exception doesn't result in the causal law 'serve unlabelled object to salesperson makes it labelled' applying, because it requires the object already be labelled.
 	% However, in general be careful.
 	% Suggestion: Should move to a more ASP-like distributed representation for causal laws, which would resolve this.
 	!.
+*/
 
 %%(2) "Item cannot be served if damaged, except to an engineer." [executability condition]
 applyActionToState_SingleCase(serve(_R, Obj, P)) :-
@@ -230,9 +236,9 @@ applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(loc(P, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
 	not(currentState(fluent(in_hand(P, _)))),
-	retract(currentState(fluent(in_hand(R, Obj)))),
+	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
 	assert(currentState(fluent(in_hand(P, Obj)))),
-	retract(currentState(fluent(labelled(Obj,_)))),
+	retract_facts_only(currentState(fluent(labelled(Obj,_)))),
 	assert(currentState(fluent(labelled(Obj,true)))),
 	!.
 	
@@ -268,8 +274,8 @@ applyActionToState_SingleCase(putdown(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
 	assert(currentState(fluent(loc(Obj, Loc)))),
-	retract(currentState(fluent(in_hand(R, Obj)))),
-	retract(currentState(fluent(item_status(Obj,_)))),
+	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
+	retract_facts_only(currentState(fluent(item_status(Obj,_)))),
 	assert(currentState(fluent(item_status(Obj,damaged)))),
 	!.
 
@@ -278,7 +284,7 @@ applyActionToState_SingleCase(putdown(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(in_hand(R, Obj))),
 	assert(currentState(fluent(loc(Obj, Loc)))),
-	retract(currentState(fluent(in_hand(R, Obj)))),
+	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
 	!.
 
 applyActionToState_SingleCase(wait(_)) :- !.
@@ -484,7 +490,7 @@ setRandomInitialObjectConfig :-
 	random_member(RA2, Alts2),
 	random_member(RB2, Alts2),
 	random_member(RC2, Alts2),
-	assertAtts([role(p0,RA2), role(p1,RB2), role(p2,RC2)]),
+	assertAtts([role_type(p0,RA2), role_type(p1,RB2), role_type(p2,RC2)]),
 	%
 	Alts3 = [pneumatic, electromagnetic],
 	random_member(RA3, Alts3),
@@ -616,8 +622,6 @@ domainAxiomClassifier([YesLiterals,NoLiterals], [YesLiterals,NoLiterals]) :- !.
 
 
 
-
-
 /*  */
 cached :-
 	domainGoalAction(Action),
@@ -626,7 +630,7 @@ cached :-
 	assert(allValidTests([
 		attr(arm_type(rob1,electromagnetic)),attr(arm_type(rob1,pneumatic)),
 		attr(obj_weight(book1,heavy)),attr(obj_weight(book1,light)),
-		attr(role_type(p1,engineer)),attr(role_type(p1,manager)),attr(role_type(p1,sales)),
+		attr(role_type(p0,engineer)),attr(role_type(p0,manager)),attr(role_type(p0,sales)),
 		attr(surface(book1,brittle)),attr(surface(book1,hard)),
 		% Action can happen in any room, so all rooms have relevant attributes
 		attr(type(rmwor,workshop)),attr(type(rmwor,office)),attr(type(rmwor,library)),
@@ -648,7 +652,7 @@ cached :-
 		)).
 %
 domainGoalAction(serve(rob1,book1,p0)). % Object served in library
-unexpectedResult([not(fluent(in_hand(p1,book1))), fluent(in_hand(rob1,book1))]).
+unexpectedResult([not(fluent(in_hand(p0,book1))), fluent(in_hand(rob1,book1))]).
 unexpectedStateFluents([loc(p0,rmlib),loc(rob1,rmlib),in_hand(rob1,book1),
 				loc(p1,rmoff),loc(p2,rmoff), loc(cup1,rmoff),
 				labelled(book1,false),labelled(cup1,false),
