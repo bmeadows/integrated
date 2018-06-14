@@ -2,7 +2,7 @@
  * Name:        rrl_domain.pl
  * Author:      Ben Meadows
  * Date:        2018-02-19
- * Description: This file encodes a domain intended for learning with q-RRL.
+ * Description: This file encodes a demonstrative domain intended for use with q-RRL learning.
  */
 
 :- discontiguous actionDescription/3, impossible_if/2, causal_law/3, currentState/1.
@@ -14,8 +14,9 @@
 % 3. State constraints
 % 4. Oracle: Actual domain transitions
 % 5. Agent knowledge
-% 6. 
-% 7. 
+% 6. Core domain functions
+% 7. Target axioms
+% 8. Scenario set-up
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -390,6 +391,13 @@ impossible_if(affix_label(Robot, Object), 53) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% 6. Core domain functions %%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
 % Observed unexpected state: Fluents depend on target action
 setObservedUnexpectedState :-
 	assert(lastActionWas(none)),
@@ -535,6 +543,10 @@ change_att_value(Input, Return) :-
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%% 7. Target axioms %%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Returns a number identifying the target axiom, or returns it back for "does not match any target axiom"
 
 % 1. Unlabelled object served to a sales person becomes labelled [CAUSAL LAW]
@@ -622,6 +634,11 @@ domainAxiomClassifier([YesLiterals,NoLiterals], [YesLiterals,NoLiterals]) :- !.
 
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% 8. Scenario set-up %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 /*  */
 cached :-
 	domainGoalAction(Action),
@@ -659,3 +676,4 @@ unexpectedStateFluents([loc(p0,rmlib),loc(rob1,rmlib),in_hand(rob1,book1),
 				item_status(book1,damaged),item_status(cup1,intact)
 	]). % An actual state from which unexpected outcomes occurred. Others are possible.
 % executabilityConditionViolated(31). % (For positive affordance learning, include a statement like this)
+
