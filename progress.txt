@@ -22,7 +22,8 @@
 21. Fixed data collector to depend on parameterised number of filters.
 22. Data collector now collates data on true positives from batch trials.
 23. Data collector now collates data on time taken during batch trials.
-24. Data collector now identifies three types of false positive ('overfitting' overspecificity, 'subset negation' overspecificity, and other) and reports them individually.
+24. Data collector now identifies three types of false positive ('overfitting' overspecificity, 'subset negation' overspecificity, and miscellaneous) and reports them individually.
 25. Fixed an example domain error giving the symbol 'role_type' as 'role'.
 26. Fixed an example domain error conflating symbols p0 and p1.
 27. Updated example domain for affordance learning.
+28. Fixed function for 'subset negation' overspecificity.
