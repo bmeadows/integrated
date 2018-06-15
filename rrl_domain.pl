@@ -46,7 +46,10 @@ domain(sort(location(rmlib))).
 domain(sort(book(book1))).
 domain(sort(cup(cup1))).
 %
-domain(sort(Term1)) :- subsort(General,Specific), functor(Term1,General,1), arg(1,Term1,Arg), functor(Term2,Specific,1), arg(1,Term2,Arg), domain(sort(Term2)).
+domain(sort(Term1)) :- subsort(General,Specific),
+	functor(Term1,General,1), arg(1,Term1,Arg),
+	functor(Term2,Specific,1), arg(1,Term2,Arg),
+	domain(sort(Term2)).
 
 % Relational rule for inferred fluent (for determining location of held item)
 currentState(fluent(loc(O,L))) :- domain(sort(object(O))), currentState(fluent(in_hand(X,O))), domain(sort(entity(X))), currentState(fluent(loc(X,L))).
@@ -109,7 +112,7 @@ domain_specified_end :-	domainGoalAction(pickup(rob1,X)), currentState(fluent(in
 domain_specified_end :- domainGoalAction(affix_label(rob1,X)), currentState(fluent(labelled(X,true))), !.
 domain_specified_end :-	stateConstraintsViolated.
 
-% Nonaction for edge cases where no actions are possible, e.g., due to unusual consequences of noise
+% Nonaction for edge cases where no actions are possible, e.g., due to unusual consequences of simulated noise
 defaultNullAction([wait(rob1)]).
 
 
@@ -147,9 +150,9 @@ applyActionToState_SingleCase(move(Robot, Loc)) :-
 	assert(		currentState(fluent(loc(Robot,Loc)))),
 	!.
 
-% Uncomment to learn the positive affordance. Having this prevents the executability condition it is based on being learned.
+% Uncomment to learn the positive affordance. The presence of this conflicts with ability to learn the executability condition it modulates.
 /*
-%%(8) "An item with a brittle surface cannot be labelled by a robot, UNLESS item is heavy and robot has electromagnetic arm." [positive affordance]
+%%(8) "An item with a brittle surface cannot be labelled by a robot, unless item is heavy and robot has electromagnetic arm." [positive affordance]
 applyActionToState_SingleCase(affix_label(R, Obj)) :-
 	currentState(fluent(loc(R, Loc))),
 	currentState(fluent(loc(Obj, Loc))),
@@ -204,9 +207,9 @@ applyActionToState_SingleCase(serve(R, Obj, _P)) :-
 	currentState(attr(arm_type(R, pneumatic))),
 	!.
 
-% Uncomment to learn the positive affordance. Having this prevents the executability condition it is based on being learned.
+% Uncomment to learn the positive affordance. The presence of this conflicts with ability to learn the executability condition it modulates.
 /*
-%%(4) "Item cannot be served if damaged, except to an engineer, UNLESS item is labelled." [positive affordance]
+%%(4) "Item cannot be served if damaged, except to an engineer, unless item is labelled." [positive affordance]
 applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	currentState(fluent(item_status(Obj, damaged))),
 	not(currentState(attr(role_type(P, engineer)))),
@@ -251,7 +254,7 @@ applyActionToState_SingleCase(serve(R, Obj, P)) :-
 	not(currentState(fluent(in_hand(P, _)))),
 	assert(currentState(fluent(in_hand(P, Obj)))),
 	retract_facts_only(currentState(fluent(in_hand(R, Obj)))),
-	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of things like exogenous events, e.g., the object is served and then the person moves
+	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, must remove, because of things like exogenous events, e.g., the object is served and then the person moves
 	!.
 
 % "Can't pick up a heavy object with a weak arm."
@@ -266,7 +269,7 @@ applyActionToState_SingleCase(pickup(R, Obj)) :-
 	currentState(fluent(loc(Obj, Loc))),
 	not(currentState(fluent(in_hand(_, Obj)))),
 	assert(currentState(fluent(in_hand(R, Obj)))),
-	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, have to remove, because of things like exogenous events (e.g., it's served and then the person moves)
+	retract_facts_only(currentState(fluent(loc(Obj, Loc)))), % If overtly given, must remove, because of things like exogenous events, e.g., the object is served and then the person moves
 	!.
 
 % Breaking a brittle object by putting it down
@@ -293,8 +296,8 @@ applyActionToState_SingleCase(wait(_)) :- !.
 applyActionToState_SingleCase(X) :-
 	writef('Note: Unexpected oracle failure.\n'),
 	print(X), nl,
-	noiseChancePercent(Noise), % Noise is likely to blame, because it can set up impossible situations - ignore it
-	((Noise > 0) -> true ; trace).
+	noiseChancePercent(Noise),
+	((Noise > 0) -> true ; trace). % Check to ignore if noise is being simulated, as it can lead to impossible states.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -302,35 +305,30 @@ applyActionToState_SingleCase(X) :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define the axioms comprising the agent's domain knowledge. Consists of:
-% actionDescription/3,	fact, arguments: action term, ordered list of action arguments, ordered list of valid types for those arguments;
-% causal_law/3,			fact, arguments: action term, list of fluent and static conditions, list of fluent consequences;
-% impossible_if/2,		rule, arguments: action term, unique numeric ID for condition... rule body contains necessary conditions for rule to fire and thus action to fail.
+% actionDescription/3,	a fact, with arguments: action term; ordered list of action arguments; ordered list of valid types for those arguments;
+% causal_law/3,			a fact, with arguments: action term; list of fluent and static conditions; list of fluent consequences;
+% impossible_if/2,		a rule, with arguments in head: action term; unique numeric ID for condition. Rule body contains necessary conditions for rule to fire and thus action to fail.
 % Each action should have one action description, any number of causal laws, and any number of executability conditions (impossible_if).
 
 actionDescription(wait(Robot), [Robot], [robot]).
 
-%
 actionDescription(move(Robot, Destination), [Robot, Destination], [robot, location]).
 causal_law(move(Robot, Destination), [], [fluent(loc(Robot, Destination))]).
 causal_law(move(Robot, _Destination), [fluent(loc(Robot, X))], [not(fluent(loc(Robot, X)))]).
 causal_law(move(Robot, _Destination), [fluent(in_hand(Robot, Object)), fluent(loc(Robot, X))], [not(fluent(loc(Object, X)))]).
 impossible_if(move(Robot, Destination), 10) :-
 	currentState(fluent(loc(Robot, Destination))).
-%
 
-%
 actionDescription(putdown(Robot, Object), [Robot, Object], [robot, item]).
 causal_law(putdown(Robot, Object), [], [not(fluent(in_hand(Robot, Object)))]).
 causal_law(putdown(Robot, Object), [fluent(loc(Robot,L))], [fluent(loc(Object, L))]).
 causal_law(putdown(_Robot, Object), [fluent(item_status(Object,intact)), attr(surface(Object, brittle))], [not(fluent(item_status(Object,intact))), fluent(item_status(Object,damaged))]). % {Tested elsewhere}
 impossible_if(putdown(Robot, Object), 20) :-
 	not(currentState(fluent(in_hand(Robot, Object)))).
-%
 
-%
 actionDescription(serve(Robot, Object, Person), [Robot, Object, Person], [robot, item, person]).
 causal_law(serve(Robot, Object, Person), [], [fluent(in_hand(Person, Object)), not(fluent(in_hand(Robot, Object)))]).
-causal_law(serve(_Robot, Object, Person), [attr(role_type(Person, sales)), fluent(labelled(Object,false))], [not(fluent(labelled(Object, false))), fluent(labelled(Object,true))]). % Causal law elided for test #1
+causal_law(serve(_Robot, Object, Person), [attr(role_type(Person, sales)), fluent(labelled(Object,false))], [not(fluent(labelled(Object, false))), fluent(labelled(Object,true))]). % Causal law to be elided for test #1
 % Causal laws do not need to overtly retract derived fluents, e.g. Object being at its holder's Location.
 impossible_if(serve(Robot, _Object, Person), 30) :-
 	not((	currentState(fluent(loc(Robot, Location))),
@@ -341,14 +339,12 @@ impossible_if(serve(_Robot, _Object, Person), 32) :-
 	currentState(fluent(in_hand(Person, _))).
 impossible_if(serve(Robot, Object, _Person), 33) :-
 	currentState(attr(surface(Object, brittle))),
-	currentState(attr(arm_type(Robot, pneumatic))). % Disaffordance elided for test #3
+	currentState(attr(arm_type(Robot, pneumatic))). % Disaffordance to be elided for test #3
 impossible_if(serve(_Robot, Object, Person), 34) :- % This combines executability condition and its positive affordance...
 	currentState(not(attr(role_type(Person, engineer)))),
 	currentState(not(fluent(item_status(Object,intact)))),
-	currentState(fluent(labelled(Object,false))). % Executability condition elided for test #2 ; both this and positive affordance elided for test #4
-%
+	currentState(fluent(labelled(Object,false))). % Executability condition to be elided for test #2 ; both this and positive affordance to be elided for test #4
 
-%	
 actionDescription(pickup(Robot, Object), [Robot, Object], [robot, item]).
 causal_law(pickup(Robot, Object), [fluent(loc(Robot,L))], [not(fluent(loc(Object, L))), fluent(in_hand(Robot, Object))]).
 impossible_if(pickup(Robot, Object), 40) :-
@@ -361,13 +357,11 @@ impossible_if(pickup(_Robot, Object), 42) :-
 	currentState(fluent(in_hand(_, Object))).
 impossible_if(pickup(Robot, _Object), 43) :-
 	currentState(fluent(in_hand(Robot, _))).
-%
 
-%
 actionDescription(affix_label(Robot, Object), [Robot, Object], [robot, object]).
 causal_law(affix_label(_Robot, Object), [fluent(labelled(Object, false))], [not(fluent(labelled(Object, false))), fluent(labelled(Object, true))]).
 causal_law(affix_label(Robot, Object), [attr(arm_type(Robot, pneumatic)), attr(obj_weight(Object, light)), fluent(item_status(Object, intact))],
-										[not(fluent(item_status(Object, intact))), fluent(item_status(Object, damaged))]). % Causal law elided for test #7
+										[not(fluent(item_status(Object, intact))), fluent(item_status(Object, damaged))]). % Causal law to be elided for test #7
 impossible_if(affix_label(Robot, Object), 50) :-
 	not((	currentState(fluent(loc(Robot, Loc))), currentState(fluent(loc(Object, Loc))) )).
 impossible_if(affix_label(_Robot, Object), 51) :-
@@ -375,28 +369,15 @@ impossible_if(affix_label(_Robot, Object), 51) :-
 impossible_if(affix_label(Robot, Object), 52) :- % This combines executability condition and its positive affordance...
 	currentState(attr(surface(Object, brittle))),
 	not((   currentState(attr(arm_type(Robot, electromagnetic))),
-		currentState(attr(obj_weight(Object, heavy)))   )). % Elided in test #5 ; both this and positive affordance elided for test #8
+		currentState(attr(obj_weight(Object, heavy)))   )). % Executability condition to be elided in test #5 ; both this and positive affordance to be elided for test #8
 impossible_if(affix_label(Robot, Object), 53) :-
 	currentState(fluent(item_status(Object, damaged))),
-	currentState(attr(arm_type(Robot, pneumatic))). % Elided in test #6
-%
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+	currentState(attr(arm_type(Robot, pneumatic))). % Disaffordance to be elided in test #6
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%% 6. Core domain functions %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 
 % Observed unexpected state: Fluents depend on target action
 setObservedUnexpectedState :-
@@ -416,29 +397,26 @@ resetStateAtRandom :-
 	setupFluentsRandomly,
 	!.
 
-% Do not call when a fluent configuration already exists.
+% Usage: Call this function only when a fluent configuration does not exist, otherwise behaviour is undefined.
 setupFluentsRandomly :-
-	% 1. Do entity locations independently
+	% 1. Establish locations of entities
 	setupEntityL(rob1), setupEntityL(p0), setupEntityL(p1), setupEntityL(p2),
-	% 2. Do fixed object locations
-	% 3. Any small object is labelled 1/2 of the time
-	% 4. Objects are either intact or damaged
-	% 5. Do non-fixed object locations dependently, because only one can be in a hand
-	%
+	% 2. Any object may be labelled
 	Alts = [true, false],
 	random_member(RA, Alts),
 	random_member(RB, Alts),
 	assert(currentState(fluent(labelled(cup1,RA)))),
 	assert(currentState(fluent(labelled(book1,RB)))),
+	% 3. Objects may be intact or damaged
 	Alts2 = [intact, damaged],
 	random_member(RA2, Alts2),
 	random_member(RB2, Alts2),
 	assert(currentState(fluent(item_status(cup1,RA2)))),
 	assert(currentState(fluent(item_status(book1,RB2)))),
-	setObjLocationsRandomlyUntilValid([book1,cup1]), % This should be done last because it tests state consistency!
+	% 4. Establish object locations last -- important, as it involves testing state consistency.
+	setObjLocationsRandomlyUntilValid([book1,cup1]),
 	!.
-	
-	
+
 setupEntityL(Entity) :-
 	List1 = [loc(Entity, rmoff), loc(Entity, rmwor), loc(Entity, rmlib)],
 	assertOneFluentAtRandom(List1).
@@ -464,18 +442,18 @@ randomiseAllLocations([A|B]) :-
 
 % Returns all physical states, even if they break constraints
 getTheoreticalStatePermutation(List) :-
-	tryalllocs([p0,p1,p2,rob1,book1,cup1],[p0,p1,p2,rob1],[rmwor,rmoff,rmlib],[],List).
+	try_all_locations([p0,p1,p2,rob1,book1,cup1],[p0,p1,p2,rob1],[rmwor,rmoff,rmlib],[],List).
 
-tryalllocs([],_,_,Return,Return).
-tryalllocs([A|B],Entities,Places,Working,Return) :-
+try_all_locations([],_,_,Return,Return).
+try_all_locations([A|B],Entities,Places,Working,Return) :-
 	not(member(A,Entities)), % Precludes people being assigned in_hand other people
 	member(X,Entities),
 	append(Working,[in_hand(X,A)],New),
-	tryalllocs(B,Entities,Places,New,Return).
-tryalllocs([A|B],Entities,Places,Working,Return) :-
+	try_all_locations(B,Entities,Places,New,Return).
+try_all_locations([A|B],Entities,Places,Working,Return) :-
 	member(X,Places),
 	append(Working,[loc(A,X)],New),
-	tryalllocs(B,Entities,Places,New,Return).
+	try_all_locations(B,Entities,Places,New,Return).
 	
 assertOneFluentAtRandom(List) :-
 	random_member(F, List),
@@ -484,8 +462,9 @@ assertOneFluentAtRandom(List) :-
 assertOneXAtRandom(List) :-
 	random_member(X, List),
 	assert(X).
-	
-setRandomInitialObjectConfig :-
+
+% Important: This function is used by the qRRL system, and must be defined in each domain.
+setRandomInitialStaticConfiguration :-
 	retract_facts_only(currentState(attr(_))),
 	%
 	Alts = [office, library, workshop],
@@ -512,107 +491,76 @@ setRandomInitialObjectConfig :-
 	Alts5 = [hard, brittle],
 	random_member(RA5, Alts5),
 	random_member(RB5, Alts5),
-	assertAtts([surface(cup1,RA5), surface(book1,RB5)]),
-	%
-	true.
-
-% This is passed in a list of RELEVANT object properties as [... attr(X), ...]
-domainChangeObjectAtts(List) :-
-	!,
-	domainChangeObjectAttsRand(List).
-	
-domainChangeObjectAttsRand(List) :-
-	random_member(X,List), % Pick one literal representing a static attribute to change at random
-	change_att_value(X, Y), % Make a valid change to something other than the original value
-	retract_facts_only(currentState(X)),
-	assert(currentState(Y)).
-
-change_att_value(Input, Return) :-
-	Input = attr(Term1),
-	functor(Term1,AttrPredicate,2),
-	arg(1,Term1,DomainObject),
-	arg(2,Term1,CurrentValue),
-	findall(Val, (functor(Term2,AttrPredicate,2), arg(2,Term1,Val), valid(attr(Term2))), List),
-	select(CurrentValue, List, RevisedList),
-	random_member(NewVal, RevisedList),
-	functor(Term3,AttrPredicate,2),
-	arg(1,Term3,DomainObject),
-	arg(2,Term3,NewVal),
-	Return = attr(Term3),
-	!.
-
+	assertAtts([surface(cup1,RA5), surface(book1,RB5)]).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%% 7. Target axioms %%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Returns a number identifying the target axiom, or returns it back for "does not match any target axiom"
+% Define all target axioms to be learned by the qRRL system.
+% The first argument is the [Positive, Negative] literals of the target axiom.
+% The second argument gives a number identifying the target axiom, or ignore_axiom if it is not to be counted as a true positive. If no target is not matched it should give any other value.
 
-% 1. Unlabelled object served to a sales person becomes labelled [CAUSAL LAW]
+% 1. Causal law: Unlabelled object served to a sales person becomes labelled.
 domainAxiomClassifier([ [attr(role_type(P, sales))], [] ], 1) :- domainGoalAction(serve(rob1,_Ob,P)), !.
 domainAxiomClassifier([ [], [attr(role_type(P, engineer)), attr(role_type(P, manager))] ], 1) :- domainGoalAction(serve(rob1,_Ob,P)), !.
 
-% 1(B) SPECIAL - already labelled
+% Technicality (ignore): Object served to a sales person is already labelled.
 domainAxiomClassifier([ [fluent(labelled(O, true))], [] ], ignore_axiom) :- domainGoalAction(serve(rob1,O,_P)), !.
 domainAxiomClassifier([ [], [fluent(labelled(O, false))] ], ignore_axiom) :- domainGoalAction(serve(rob1,O,_P)), !.
 
-% 2. Damaged object, not served to engineer [EXECUTABILITY CONDITION]
+% 2. Executability condition: A damaged object, served to a non-engineer, causes action failure.
 domainAxiomClassifier([ [], [attr(role_type(P, engineer)), fluent(item_status(O1, intact))] ], 2) :- domainGoalAction(serve(rob1,O1,P)), !.
 domainAxiomClassifier([ [fluent(item_status(O1, damaged))], [attr(role_type(P,engineer))] ], 2) :- domainGoalAction(serve(rob1,O1,P)), !.
 
-%%(3) A robot with a pneumatic arm cannot serve a brittle object [negative affordance]
+% 3. Negative affordance: A robot with a pneumatic arm cannot serve a brittle object.
 domainAxiomClassifier([ [],[attr(arm_type(rob1,electromagnetic)),attr(surface(O1,hard))] ], 3) :- domainGoalAction(serve(rob1,O1,_P)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic)),attr(surface(O1,brittle))],[] ], 3) :- domainGoalAction(serve(rob1,O1,_P)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic))],[attr(surface(O1,hard))] ], 3) :- domainGoalAction(serve(rob1,O1,_P)), !.
 domainAxiomClassifier([ [attr(surface(O1,brittle))],[attr(arm_type(rob1,electromagnetic))] ], 3) :- domainGoalAction(serve(rob1,O1,_P)), !.
 
-% 4. Positive affordance - even when a damaged object is served to a non-engineer, under conditions [object is labelled], 'serve(rob1,book1,p1)' is possible
+% 4. Positive affordance: Even when a damaged object is served to a non-engineer, under conditions [object is labelled], serve action may succeed.
 domainAxiomClassifier([ [fluent(labelled(O1, true))], [] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
 domainAxiomClassifier([ [], [fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
-% POSITIVE AFFORDANCES INCLUDING PARTIAL INFORMATION FROM THEIR ASSOCIATED EXECUTABILITY CONDITION ARE OKAY
+% Versions of positive affordances that include partial information from their associated executability condition are considered to be valid as target axioms:
 domainAxiomClassifier([ [fluent(labelled(O1, true))], [attr(role_type(P1,engineer))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
 domainAxiomClassifier([ [], [attr(role_type(P1,engineer)), fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
-%
 domainAxiomClassifier([ [fluent(labelled(O1, true))], [fluent(item_status(O1, intact))] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
 domainAxiomClassifier([ [], [fluent(item_status(O1, intact)), fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
 domainAxiomClassifier([ [fluent(labelled(O1, true))], [attr(role_type(P1,engineer)), fluent(item_status(O1, intact))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
 domainAxiomClassifier([ [], [attr(role_type(P1,engineer)), fluent(item_status(O1, intact)), fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
-%
 domainAxiomClassifier([ [fluent(item_status(O1, damaged)), fluent(labelled(O1, true))], [] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
 domainAxiomClassifier([ [fluent(item_status(O1, damaged))], [fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,_P1)), !.
 domainAxiomClassifier([ [fluent(item_status(O1, damaged)), fluent(labelled(O1, true))], [attr(role_type(P1,engineer))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
 domainAxiomClassifier([ [fluent(item_status(O1, damaged))], [attr(role_type(P1,engineer)), fluent(labelled(O1, false))] ], 4) :- domainGoalAction(serve(rob1,O1,P1)), !.
 
-% 5. No hard surface - label [EXECUTABILITY CONDITION]
+% 5. Executability condition: An object without a hard surface, when labelling is attempted, causes action failure.
 domainAxiomClassifier([ [attr(surface(O1, brittle))], [] ], 5) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [], [attr(surface(O1, hard))] ], 5) :- domainGoalAction(affix_label(rob1,O1)), !.
 
-% 6. Damaged - label with pneumatic arm [NEGATIVE AFFORDANCE]
+% 6. Negative affordance: A robot with a pneumatic arm cannot label a damaged object.
 domainAxiomClassifier([ [],[attr(arm_type(rob1,electromagnetic)),fluent(item_status(O1,intact))] ], 6) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic)),fluent(item_status(O1,damaged))],[] ], 6) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic))],[fluent(item_status(O1,intact))] ], 6) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [fluent(item_status(O1,damaged))],[attr(arm_type(rob1,electromagnetic))] ], 6) :- domainGoalAction(affix_label(rob1,O1)), !.
 
-%%(7) labelling a light object with a pneumatic arm causes it to be damaged [causal law]
+% 7. Causal law: Light object labelled with a pneumatic arm becomes damaged.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic)), attr(obj_weight(O1,light))], [] ], 7) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(obj_weight(O1,light))], [attr(arm_type(rob1,electromagnetic))] ], 7) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,pneumatic))], [attr(obj_weight(O1,heavy))] ], 7) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [], [attr(arm_type(rob1,electromagnetic)), attr(obj_weight(O1,heavy))] ], 7) :- domainGoalAction(affix_label(rob1,O1)), !.
 
-% 7(B) SPECIAL - already damaged
+% Technicality (ignore): Object being labelled is already damaged.
 domainAxiomClassifier([ [fluent(item_status(O1, damaged))], [] ], ignore_axiom) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [], [fluent(item_status(O1, intact))] ], ignore_axiom) :- domainGoalAction(affix_label(rob1,O1)), !.
 
-%%%%%%%%%%%%%%%%%%%%
-
-%%(8) "An item which does not have surface 'hard' cannot be labelled by a robot, UNLESS item is heavy and robot has electromagnetic arm." [positive affordance]
-% 8. Positive affordance - even when cup1 is brittle [5], under conditions [object is heavy, robot arm is electromagnetic], 'affix_label(rob1, cup1)' is possible
+% 8. Positive affordance: Even when an object without a hard surface is labelled by a robot, under conditions [object is heavy and robot has electromagnetic arm], label action may succeed.
 domainAxiomClassifier([ [attr(arm_type(rob1,electromagnetic)),attr(obj_weight(O1,heavy))], [] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,electromagnetic))], [attr(obj_weight(O1,light))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(obj_weight(O1,heavy))], [attr(arm_type(rob1,pneumatic))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [], [attr(arm_type(rob1,pneumatic)),attr(obj_weight(O1,light))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
-% POSITIVE AFFORDANCES INCLUDING PARTIAL INFORMATION FROM THEIR ASSOCIATED EXECUTABILITY CONDITION ARE OKAY
+% Versions of positive affordances that include partial information from their associated executability condition are considered to be valid as target axioms:
 domainAxiomClassifier([ [attr(arm_type(rob1,electromagnetic)), attr(obj_weight(O1,heavy)), attr(surface(O1, brittle))], [] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(arm_type(rob1,electromagnetic)), attr(surface(O1, brittle))], [attr(obj_weight(O1,light))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [attr(obj_weight(O1,heavy)), attr(surface(O1, brittle))], [attr(arm_type(rob1,pneumatic))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
@@ -622,28 +570,16 @@ domainAxiomClassifier([ [attr(arm_type(rob1,electromagnetic))], [attr(obj_weight
 domainAxiomClassifier([ [attr(obj_weight(O1,heavy))], [attr(arm_type(rob1,pneumatic)), attr(surface(O1, hard))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 domainAxiomClassifier([ [], [attr(arm_type(rob1,pneumatic)), attr(obj_weight(O1,light)), attr(surface(O1, hard))] ], 8) :- domainGoalAction(affix_label(rob1,O1)), !.
 
-
-
-
-%%%%%%%%%%%%%%%%%%%%
-
-% Catch case: Everything else
+% Catch case: Fail to match any target axiom.
 domainAxiomClassifier([YesLiterals,NoLiterals], [YesLiterals,NoLiterals]) :- !.
-
-%%%%%%%%%%%%%%%%%%%%
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%% 8. Scenario set-up %%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-/*  */
+% Provides a cached version of the calculated 'relevant subset' of parts of the domain.
 cached :-
-	domainGoalAction(Action),
-	Action =.. [_Predicate|ArgList],
-	assert(targetActionArgs(ArgList)), % TODO check if this is still necessary
 	assert(allValidTests([
 		attr(arm_type(rob1,electromagnetic)),attr(arm_type(rob1,pneumatic)),
 		attr(obj_weight(book1,heavy)),attr(obj_weight(book1,light)),
@@ -662,18 +598,24 @@ cached :-
 		fluent(item_status(book1,intact)),fluent(item_status(book1,damaged)),
 		action(serve(rob1,book1,p0)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,rmwor)),action(move(rob1,rmoff)),action(move(rob1,rmlib)),action(affix_label(rob1,book1))
 		])),
-		% 3 room types * 3 room types * 3 room types * 3 person roles * 2 arm types * 2 book weights * 2 book surfaces; cup and two people are not relevant
-		assert(num_possible_attribute_configs(648)),
+	% 3 room types * 3 room types * 3 room types * 3 person roles * 2 arm types * 2 book weights * 2 book surfaces; cup and two people are not relevant
+	assert(num_possible_attribute_configs(648)),
 	assert(usableActionList(
 		[action(serve(rob1,book1,p0)),action(pickup(rob1,book1)),action(putdown(rob1,book1)),action(move(rob1,rmwor)),action(move(rob1,rmoff)),action(move(rob1,rmlib)),action(affix_label(rob1,book1))]
 		)).
-%
-domainGoalAction(serve(rob1,book1,p0)). % Object served in library
+
+% The observed action with unexpected consequences that initiated learning.
+domainGoalAction(serve(rob1,book1,p0)).
+
+% The unexpected consequences that were observed.
 unexpectedResult([not(fluent(in_hand(p0,book1))), fluent(in_hand(rob1,book1))]).
+
+% An actual state from which unexpected outcomes were observed to occur. Others are possible.
 unexpectedStateFluents([loc(p0,rmlib),loc(rob1,rmlib),in_hand(rob1,book1),
 				loc(p1,rmoff),loc(p2,rmoff), loc(cup1,rmoff),
 				labelled(book1,false),labelled(cup1,false),
 				item_status(book1,damaged),item_status(cup1,intact)
-	]). % An actual state from which unexpected outcomes occurred. Others are possible.
-% executabilityConditionViolated(31). % (For positive affordance learning, include a statement like this)
+	]).
 
+% When learning positive affordances, a statement in this form should be included to indicate which executability condition appeared to be violated:
+% executabilityConditionViolated(31).

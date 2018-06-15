@@ -24,7 +24,8 @@ relevantTestLitAttr(Lit) :-
 	relevantToTarg(L).
 relevantToTarg(L) :-
 	L =.. [_Predicate|Args],
-	targetActionArgs(List),
+	domainGoalAction(Action),
+	Action =.. [_Predicate|List],
 	member(A, Args),
 	member(A, List).
 /*
@@ -38,7 +39,8 @@ relevantToTargetAction(L) :-
 relevantDomainTestAlternatives(OptionList) :- 
 	valid(attr(L)),
 	L =.. [Predicate, Object, _Value],
-	targetActionArgs(List),
+	domainGoalAction(Action),
+	Action =.. [_Predicate|List],
 	member(Object, List),
 	findall(	[Predicate,Object,Val],
 				(valid(attr(L1)), L1 =.. [Predicate,Object,Val]),
@@ -158,15 +160,49 @@ makeSingleFluentChange :-
 	swapOut(Fluent),
 	!.
 
+% Helper function for adding fluents to the state.
 assertFluents([]).
 assertFluents([A|B]) :-
 	assert(currentState(fluent(A))),
 	assertFluents(B).
 
+% Helper function for adding static attributes to the state.
 assertAtts([]).
 assertAtts([A|B]) :-
 	assert(currentState(attr(A))),
 	assertAtts(B).
+
+	
+	
+
+	
+	
+	
+domainChangeObjectAtts(List) :-
+	!,
+	domainChangeObjectAttsRandomly(List).
+	
+% Important: This function is used by the qRRL system, and must be defined in each domain.
+% The function is passed in a list of RELEVANT object properties as [..., attr(X), ...]
+domainChangeObjectAttsRandomly(List) :-
+	random_member(X,List), % Pick one literal representing a static attribute to change at random
+	change_att_value(X, Y), % Make a valid change to something other than the original value
+	retract_facts_only(currentState(X)),
+	assert(currentState(Y)).
+
+change_att_value(Input, Return) :-
+	Input = attr(Term1),
+	functor(Term1,AttrPredicate,2),
+	arg(1,Term1,DomainObject),
+	arg(2,Term1,CurrentValue),
+	findall(Val, (functor(Term2,AttrPredicate,2), arg(2,Term1,Val), valid(attr(Term2))), List),
+	select(CurrentValue, List, RevisedList),
+	random_member(NewVal, RevisedList),
+	functor(Term3,AttrPredicate,2),
+	arg(1,Term3,DomainObject),
+	arg(2,Term3,NewVal),
+	Return = attr(Term3),
+	!.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -175,10 +211,8 @@ precalculate :-
 	writef('1/7. Precalculating.\n'),
 	retractall(objrel(_)),
 	domainGoalAction(Action),
-	Action =.. [_Predicate|ArgList],
-	assert(targetActionArgs(ArgList)),
 	writef('2/7. Target action.\n'),
-	setRandomInitialObjectConfig, % Source of the current error with this component. This randomly sets static attributes!
+	setRandomInitialStaticConfiguration, % Source of the current error with this component. This randomly sets static attributes!
 	writef('3/7. Randomised.\n'),
 	findRelevantFluentSuperset(Action, Lits),
 	writef('4/7. Superset found.\n'),
@@ -193,7 +227,7 @@ precalculate :-
 	statistics(process_cputime, EndCPU),
 	CPUDIFF is EndCPU - StartCPU,
 	writef('CPU: '), print(CPUDIFF), nl.
-	
+
 % For each valid physical state from which the target ground action is permissible, find the relevant literals to that <physical state, action> pair.
 findRelevantFluentSuperset(Action, Lits) :-
 	findall(	Fluents, 
@@ -223,7 +257,8 @@ adjustForRelevance(Lits, ReturnedTests, ReturnedObjectSet) :-
 % Returns fluents relevant to the action, based on current physical state
 % Also asserts names of relevant objects in "objrel(X)".
 getRelevantFluentLits(Set2) :-
-	targetActionArgs(Set1), % 1. For the set1 of objects named in the action predicate;
+	domainGoalAction(Action),
+	Action =.. [_Predicate|Set1], % 1. For the set1 of objects named in the action predicate;
 	findall( 	F,
 				(currentState(F), F=fluent(Content), Content =.. [_Pred|ArgList], length(ArgList, N), N>0, last(ArgList, Last), select(Last, ArgList, Remnant), allAreIn(Remnant, Set1) ),
 				Set2
@@ -249,8 +284,9 @@ allAreIn(SetA, SetB) :-
 
 addAllObjectAttributesAndActions(Initial, Return, ReturnedObjectSet) :-	
 	findall(X, objrel(X), ListObs),
-	targetActionArgs(AAs),
-	append(ListObs, AAs, NewList), % Add the arguments of the target action
+	domainGoalAction(Action),
+	Action =.. [_Predicate|ActionArgs],
+	append(ListObs, ActionArgs, NewList), % Add the arguments of the target action
 	sort(NewList, ReturnedObjectSet),
 	addAllRelevantActions(ReturnedObjectSet, Initial, NewSet),
 	% At this point, just need to find valid BDT tests, so find all relevant instantiated object properties
@@ -320,19 +356,19 @@ establishGoalState :-
 	learning_type(positive_affordance_learning),
 	!,
 	executabilityConditionViolated(ID),
-	domainGoalAction(ACTION),
-	clause(impossible_if(ACTION, ID),_),
-	Element = requiredToCheckBeforeTransition(ACTION, ID),
+	domainGoalAction(Action),
+	clause(impossible_if(Action, ID),_),
+	Element = requiredToCheckBeforeTransition(Action, ID),
 	establishGS([ Element ]).
 establishGoalState :-
 	% Not positive_affordance_learning
 	establishGS([]).
 	
 establishGS(List) :-
-	domainGoalAction(ACT),
+	domainGoalAction(Act),
 	% Unexpected observations
 	unexpectedResult(X),
-	append(X, [lastActionWas(ACT)], List1),
+	append(X, [lastActionWas(Act)], List1),
 	append(List1, List, List2),
 	assert(goalState(List2)).
 

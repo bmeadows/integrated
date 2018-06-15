@@ -402,7 +402,7 @@ learnAllObjectConfigurations :-
 	Str = 'data-', get_time(TimeStamp), atom_concat(Str, TimeStamp, Stream), 
 	retractall(data_output_file(_)),
 	assert(data_output_file(Stream)),
-	setRandomInitialObjectConfig,
+	setRandomInitialStaticConfiguration,
 	makePrincipledChangeToObjectConfig,
 	doAllEpisodes,
 	!,
@@ -491,7 +491,7 @@ makePrincipledChangeToObjectConfig :-
 	
 makePrincipledChangeToObjAttConfiguration :-
 	enter_register(change_obj_att_configs),
-	setRandomInitialObjectConfig,
+	setRandomInitialStaticConfiguration,
 	randomWalkCurrentObjectConfig,
 	exit_register(change_obj_att_configs),
 	!,
@@ -1503,7 +1503,7 @@ restoreFromList([A|B]) :-
 % 4. Returns if the target impossible_if condition applies and the other impossible_if clauses don't; else starts over
 setAndTryNonvirtuousState(Act,ID,True,False) :-
 	resetStateAtRandom,
-	setRandomInitialObjectConfig,
+	setRandomInitialStaticConfiguration,
 	!,
 	setAndTryNonvirtuousState_sub_function(Act,ID,True,False).
 
@@ -1540,7 +1540,7 @@ setAndTryNonvirtuousState_sub_function(Act,ID,True,False) :-
 % 3. Checks for consistency of the new physical state; returns if consistent, else starts over
 setAndTryVirtuousState(True,False) :-
 	resetStateAtRandom,
-	setRandomInitialObjectConfig,
+	setRandomInitialStaticConfiguration,
 	storeCurrentStateAndConfig(List),
 	!,
 	((unfixable_virtuous_state_deviation(False) ; systemThinksActionWillFailInDomain ; actionActuallyHasUnexpectedOutcomeInDomain) -> setAndTryVirtuousState(True,False) ; 
