@@ -7,6 +7,7 @@
 
 :- discontiguous actionDescription/3, impossible_if/2, causal_law/3, currentState/1.
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contents
 % 1. Abstract domain description

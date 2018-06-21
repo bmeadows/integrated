@@ -27,3 +27,6 @@
 26. Fixed an example domain error conflating symbols p0 and p1.
 27. Updated example domain for affordance learning.
 28. Fixed function for 'subset negation' overspecificity.
+29. Improved inline documentation and reordered several functions.
+30. Removed considerable dead and deprecated code from meta.pl.
+31. Refactored meta.pl.

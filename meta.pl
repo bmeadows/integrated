@@ -7,204 +7,21 @@
 
 :- dynamic goalState/1, precalculate/0, step/1.
 
-relevantTestLiteral(Lit) :-
-	relevantTestLitAction(Lit).
-relevantTestLiteral(Lit) :-
-	relevantTestLitAttr(Lit).
-relevantTestLitAction(Lit) :-
-	Lit = action(T),
-	valid(Lit),
-	relevantToTarg(T).
-relevantTestLitAttr(Lit) :-
-	Lit = attr(L),
-	valid(Lit),
-	L =.. [_Predicate|Args],
-	Args \= [_SingleElement],
-	Args \= [],
-	relevantToTarg(L).
-relevantToTarg(L) :-
-	L =.. [_Predicate|Args],
-	domainGoalAction(Action),
-	Action =.. [_Predicate|List],
-	member(A, Args),
-	member(A, List).
-/*
-relevantToTargetAction(L) :-
-	L =.. [_Predicate, Object, _Value],
-	targetActionArgs(List),
-	member(Object, List).
-*/
 
-	
-relevantDomainTestAlternatives(OptionList) :- 
-	valid(attr(L)),
-	L =.. [Predicate, Object, _Value],
-	domainGoalAction(Action),
-	Action =.. [_Predicate|List],
-	member(Object, List),
-	findall(	[Predicate,Object,Val],
-				(valid(attr(L1)), L1 =.. [Predicate,Object,Val]),
-				ValueTriples),
-	sort(ValueTriples,OptionList).
-	% Note this results in doubling up, so need to reduce to a true set elsewhere
-	
-reduceOpsToNums(ListOfLists, Return) :-
-	reduceOpsToNumbers(ListOfLists, [], Return).
-reduceOpsToNumbers([], Return, Return) :- !.
-reduceOpsToNumbers([H|T], Current, Return) :- 
-	length(H,X),
-	append([X], Current, Next),
-	reduceOpsToNumbers(T, Next, Return).
-
-multiplyOut([], Result, Result) :- !.
-multiplyOut([H|T], N, Result) :-
-	Next is H * N,
-	multiplyOut(T, Next, Result).
-
-getCurrentRelevantConfigurationOfAttributes(RelevantConfigList) :-
-	allValidTests(TSTS), % Includes actions and fluents, too
-	findall(attr(Attr),
-		(currentState(attr(Attr)), member(attr(Attr), TSTS)), % Note that TSTS *already* has the attr() wrappers (amongst others)
-		AttrList),
-	sort(AttrList,RelevantConfigList).
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Contents
+% 1. Reduction to relevant signature
+% 2. Accessing relevance information
+% 3. Noise simulation
+% 4. Operations on the state
+% 5. Action applicability
+% 6. Initial directives
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% 7 February 2017
-
-applyNoiseWhereAppropriate :-
-	noiseChancePercent(0),
-	!.
-applyNoiseWhereAppropriate :-
-	useNoiseRelevantToAction(true),
-	noiseChancePercent(N),
-	random_between(1,100,Rand1),
-	% N% chance to change fluent relevant to action
-	((Rand1 =< N) -> switchActionOutcome ; true),
-	!.
-applyNoiseWhereAppropriate :-
-	useNoiseRelevantToAction(false),
-	noiseChancePercent(N),
-	random_between(1,100,Rand1),
-	% N% chance to change some fluent in domain
-	((Rand1 =< N) -> switchAFluent ; true),
-	!.
-applyNoiseWhereAppropriate :- trace.
-
-switchAFluent :-
-	findall(fluent(Fl), currentState(fluent(Fl)), FList),
-	random_member(F, FList),
-	get_all_alternative_domain_tests(F, AltList),
-	retract(currentState(F)),
-	random_member(NewFluent, AltList),
-	assert(currentState(NewFluent)),
-	(stateConstraintsViolated -> switchAFluent ; true). % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
-	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
-	
-switchActionOutcome :-
-	allValidTests(Tests),
-	findall( X, (member(X, Tests), X = fluent(_), not(currentState(X))), List), % Get all relevant fluents not currently true
-	(
-	(List == [])
-	->
-	true
-	; 
-	(random_member(Fluent, List), % Take one at random
-	assert(currentState(Fluent)),
-	get_all_alternative_domain_tests(Fluent, AltList),
-	retracteachfromstate(AltList), % First attempt to obey state constraints
-	% If still inconsistent, fall back on changing a RANDOM fluent - this should not be a recursive call to switchActionOutcome
-	(stateConstraintsViolated -> switchAFluent ; true) % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
-	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
-	)),
-	!.
-	
-retracteachfromstate([]).
-retracteachfromstate([A|B]) :- retract_facts_only(currentState(A)), retracteachfromstate(B).
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-resetStateInPrincipledWay :-
-	setObservedUnexpectedState,
-	permuteStateSemiRandomly,
-	!,
-	(stateConstraintsViolated -> resetStateInPrincipledWay ; true).
-	
-% Change an observed failure state to a semi-random permutation.
-% Note this can cause bad states; must check for violations after calling.
-permuteStateSemiRandomly :-
-	fluent_change_iterations(N),
-	fluent_change_chance(P),
-	permuteStateSemiRandomlyIterate(N,P).
-	
-permuteStateSemiRandomlyIterate(0,_) :- !.
-permuteStateSemiRandomlyIterate(N,P) :-
-	random(R),
-	(R < P -> makeSingleFluentChange ; true),
-	N2 is N-1,
-	permuteStateSemiRandomlyIterate(N2,P).
-
-makeSingleFluentChange :- 
-	% Select a random fluent currentState(fluent(f)), then call swapOut(fluent(f))
-	findall(F, (currentState_overt_belief_only(F), F=fluent(_)), List), % Just currentState() will go wrong because of inferred beliefs not actively believed
-	random_member(Fluent,List),
-	swapOut(Fluent),
-	!.
-
-% Helper function for adding fluents to the state.
-assertFluents([]).
-assertFluents([A|B]) :-
-	assert(currentState(fluent(A))),
-	assertFluents(B).
-
-% Helper function for adding static attributes to the state.
-assertAtts([]).
-assertAtts([A|B]) :-
-	assert(currentState(attr(A))),
-	assertAtts(B).
-
-	
-	
-
-	
-	
-	
-domainChangeObjectAtts(List) :-
-	!,
-	domainChangeObjectAttsRandomly(List).
-	
-% Important: This function is used by the qRRL system, and must be defined in each domain.
-% The function is passed in a list of RELEVANT object properties as [..., attr(X), ...]
-domainChangeObjectAttsRandomly(List) :-
-	random_member(X,List), % Pick one literal representing a static attribute to change at random
-	change_att_value(X, Y), % Make a valid change to something other than the original value
-	retract_facts_only(currentState(X)),
-	assert(currentState(Y)).
-
-change_att_value(Input, Return) :-
-	Input = attr(Term1),
-	functor(Term1,AttrPredicate,2),
-	arg(1,Term1,DomainObject),
-	arg(2,Term1,CurrentValue),
-	findall(Val, (functor(Term2,AttrPredicate,2), arg(2,Term1,Val), valid(attr(Term2))), List),
-	select(CurrentValue, List, RevisedList),
-	random_member(NewVal, RevisedList),
-	functor(Term3,AttrPredicate,2),
-	arg(1,Term3,DomainObject),
-	arg(2,Term3,NewVal),
-	Return = attr(Term3),
-	!.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% 1. Reduction to relevant signature %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 precalculate :-
 	statistics(process_cputime, StartCPU),
@@ -349,8 +166,141 @@ multiply_out_list([A|B], Working, Final) :-
 	multiply_out_list(B, New, Final).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% 2. Accessing relevance information %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+getCurrentRelevantConfigurationOfAttributes(RelevantConfigList) :-
+	allValidTests(Tests), % Includes actions and fluents, too
+	findall(attr(Attr),
+		(currentState(attr(Attr)), member(attr(Attr), Tests)), % Note that Tests *already* has the attr() wrappers (amongst others)
+		AttrList),
+	sort(AttrList,RelevantConfigList).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 3. Noise simulation %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+applyNoiseWhereAppropriate :-
+	noiseChancePercent(0),
+	!.
+applyNoiseWhereAppropriate :-
+	useNoiseRelevantToAction(true),
+	noiseChancePercent(N),
+	random_between(1,100,Rand1),
+	% N% chance to change fluent relevant to action
+	((Rand1 =< N) -> switchActionOutcome ; true),
+	!.
+applyNoiseWhereAppropriate :-
+	useNoiseRelevantToAction(false),
+	noiseChancePercent(N),
+	random_between(1,100,Rand1),
+	% N% chance to change some fluent in domain
+	((Rand1 =< N) -> switchAFluent ; true),
+	!.
+applyNoiseWhereAppropriate :- trace.
+
+switchAFluent :-
+	findall(fluent(Fl), currentState(fluent(Fl)), FList),
+	random_member(F, FList),
+	get_all_alternative_domain_tests(F, AltList),
+	retract(currentState(F)),
+	random_member(NewFluent, AltList),
+	assert(currentState(NewFluent)),
+	(stateConstraintsViolated -> switchAFluent ; true). % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
+	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
+	
+switchActionOutcome :-
+	allValidTests(Tests),
+	findall( X, (member(X, Tests), X = fluent(_), not(currentState(X))), List), % Get all relevant fluents not currently true
+	(
+	(List == [])
+	->
+	true
+	; 
+	(random_member(Fluent, List), % Take one at random
+	assert(currentState(Fluent)),
+	get_all_alternative_domain_tests(Fluent, AltList),
+	retracteachfromstate(AltList), % First attempt to obey state constraints
+	% If still inconsistent, fall back on changing a RANDOM fluent - this should not be a recursive call to switchActionOutcome
+	(stateConstraintsViolated -> switchAFluent ; true) % Very important - just replacing with something from get_all_alternative_domain_tests can still result in causal violation.
+	% That in turn causes things like learning a constraint that incorporates a physical constraint violation, which makes filter checking hang forever!
+	)),
+	!.
+	
+retracteachfromstate([]).
+retracteachfromstate([A|B]) :- retract_facts_only(currentState(A)), retracteachfromstate(B).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%% 4. Operations on the state %%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+resetStateInPrincipledWay :-
+	setObservedUnexpectedState,
+	permuteStateSemiRandomly,
+	!,
+	(stateConstraintsViolated -> resetStateInPrincipledWay ; true).
+	
+% Change an observed failure state to a semi-random permutation.
+% Note this can cause bad states; must check for violations after calling.
+permuteStateSemiRandomly :-
+	fluent_change_iterations(N),
+	fluent_change_chance(P),
+	permuteStateSemiRandomlyIterate(N,P).
+	
+permuteStateSemiRandomlyIterate(0,_) :- !.
+permuteStateSemiRandomlyIterate(N,P) :-
+	random(R),
+	(R < P -> makeSingleFluentChange ; true),
+	N2 is N-1,
+	permuteStateSemiRandomlyIterate(N2,P).
+
+makeSingleFluentChange :- 
+	% Select a random fluent currentState(fluent(f)), then call swapOut(fluent(f))
+	findall(F, (currentState_overt_belief_only(F), F=fluent(_)), List), % Just currentState() will go wrong because of inferred beliefs not actively believed
+	random_member(Fluent,List),
+	swapOut(Fluent),
+	!.
+
+% Helper function for adding fluents to the state.
+assertFluents([]).
+assertFluents([A|B]) :-
+	assert(currentState(fluent(A))),
+	assertFluents(B).
+
+% Helper function for adding static attributes to the state.
+assertAtts([]).
+assertAtts([A|B]) :-
+	assert(currentState(attr(A))),
+	assertAtts(B).
+
+domainChangeObjectAtts(List) :-
+	!,
+	domainChangeObjectAttsRandomly(List).
+	
+% Important: This function is used by the qRRL system, and must be defined in each domain.
+% The function is passed in a list of RELEVANT object properties as [..., attr(X), ...]
+domainChangeObjectAttsRandomly(List) :-
+	random_member(X,List), % Pick one literal representing a static attribute to change at random
+	change_att_value(X, Y), % Make a valid change to something other than the original value
+	retract_facts_only(currentState(X)),
+	assert(currentState(Y)).
+
+change_att_value(Input, Return) :-
+	Input = attr(Term1),
+	functor(Term1,AttrPredicate,2),
+	arg(1,Term1,DomainObject),
+	arg(2,Term1,CurrentValue),
+	findall(Val, (functor(Term2,AttrPredicate,2), arg(2,Term1,Val), valid(attr(Term2))), List),
+	select(CurrentValue, List, RevisedList),
+	random_member(NewVal, RevisedList),
+	functor(Term3,AttrPredicate,2),
+	arg(1,Term3,DomainObject),
+	arg(2,Term3,NewVal),
+	Return = attr(Term3),
+	!.
 
 establishGoalState :-
 	learning_type(positive_affordance_learning),
@@ -372,10 +322,35 @@ establishGS(List) :-
 	append(List1, List, List2),
 	assert(goalState(List2)).
 
-:- establishGoalState.
+applyActionToState(Action) :-
+	step(I),
+	% 1. Update time
+	retractall(step(I)),
+	max_step(Max),
+	(I == Max -> J = last ; J is I + 1), % Domain has maximum number of steps per episode
+	assert(step(J)),
+	% 2. Apply action
+	applyActionToState_SingleCase(Action),
+	applyNoiseWhereAppropriate.
+
+% Removes only fluents that match the pattern and are not clauses.
+% This is necessary because e.g. retractall(currentState(foo(1,2))) will retract RULES like 'currentState(foo(A,B)) :- currentState(bar(A,B)), valid(sort(A)).'
+% These are needed if a domain has derived fluents, e.g., location dynamically inferred from being inside a container that is at a location.
+retract_facts_only(Pattern) :-
+	clause(Pattern, true), % Establishes we only match against facts
+	retract(Pattern), % Only retract exactly that fact
+	fail. % Failure-driven loop means 'Pattern' term doesn't get variables set, unlike in recursive loop
+retract_facts_only(_) :- !.
+
+currentState_overt_belief_only(X) :-
+	clause(currentState(X), true), % There is a 'belief that X' in the fact store.
+	not(( clause(currentState(X), Tail), Tail \= true, Tail )).  % 'belief that X' cannot be derived from other terms.
+	% The reason BOTH checks are made is to help in cases where the system inappropriately findalls currentState beliefs and then later 'reinstates' them, turning a derived belief into a reified belief.
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% 5. Action applicability %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 validAction(A) :- actionDescription(A, Vars, Sorts), sortsHoldTrue(Sorts, Vars), not(impossible_if(A,_ID)).
 
@@ -396,40 +371,10 @@ sortsHoldTrue([Sort|Tail1], [Var|Tail2]) :-
 	sortsHoldTrue(Tail1, Tail2).
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 6. Initial directives %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-applyActionToState(Action) :-
-	step(I),
-	% 1. Update time
-	retractall(step(I)),
-	max_step(Max),
-	(I == Max -> J = last ; J is I + 1), % Domain has maximum number of steps per episode
-	assert(step(J)),
-	% 2. Apply action
-	applyActionToState_SingleCase(Action),
-	applyNoiseWhereAppropriate.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-% Removes only fluents that match the pattern and are not clauses.
-% This is necessary because e.g. retractall(currentState(foo(1,2))) will retract RULES like 'currentState(foo(A,B)) :- currentState(bar(A,B)), valid(sort(A)).'
-% These are needed if a domain has derived fluents, e.g., location dynamically inferred from being inside a container that is at a location.
-retract_facts_only(Pattern) :-
-	clause(Pattern, true), % Establishes we only match against facts
-	retract(Pattern), % Only retract exactly that fact
-	fail. % Failure-driven loop means 'Pattern' term doesn't get variables set, unlike in recursive loop
-retract_facts_only(_) :- !.
-
-currentState_overt_belief_only(X) :-
-	clause(currentState(X), true), % There is a 'belief that X' in the fact store.
-	not(( clause(currentState(X), Tail), Tail \= true, Tail )).  % 'belief that X' cannot be derived from other terms.
-	% The reason BOTH checks are made is to help in cases where the system inappropriately findalls currentState beliefs and then later 'reinstates' them, turning a derived belief into a reified belief.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+:- establishGoalState.
 	
 :- domain_relevance(X), call(X).
-
-
