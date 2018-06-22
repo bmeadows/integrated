@@ -75,13 +75,13 @@ adjustForRelevance(Lits, ReturnedTests, ReturnedObjectSet) :-
 % Also asserts names of relevant objects in "objrel(X)".
 getRelevantFluentLits(Set2) :-
 	domainGoalAction(Action),
-	Action =.. [_Predicate|Set1], % 1. For the set1 of objects named in the action predicate;
+	Action =.. [_Predicate1|Set1], % 1. For the set1 of objects named in the action predicate;
 	findall( 	F,
-				(currentState(F), F=fluent(Content), Content =.. [_Pred|ArgList], length(ArgList, N), N>0, last(ArgList, Last), select(Last, ArgList, Remnant), allAreIn(Remnant, Set1) ),
+				(currentState(F), F=fluent(Content), Content =.. [_Predicate2|ArgList], length(ArgList, N), N>0, last(ArgList, Last), select(Last, ArgList, Remnant), allAreIn(Remnant, Set1) ),
 				Set2
 			), % 2. Find the set2 of all currently-true-in-state fluents such that the fluent's arguments are all in set1;
 	findall( 	LastConstant,
-				(member(fluent(Content),Set2), Content =.. [_Predicate|ArgList], last(ArgList, LastConstant) ),
+				(member(fluent(Content),Set2), Content =.. [_Predicate3|ArgList], last(ArgList, LastConstant) ),
 				Set3
 			), % 3. Let set3 be the set of constants mapped onto by set2;
 	assertEachAsObjRel(Set3).

@@ -2047,6 +2047,15 @@ one_step :-
 	exit_register('ep_steps:main'),
 	one_step.
 
+relevantTestLitAction(Literal) :-
+	Literal = action(L),
+	valid(Literal),
+	L =.. [_Pred1|Args],
+	domainGoalAction(Action),
+	Action =.. [_Pred2|List],
+	member(A, Args),
+	member(A, List).
+
 /*
 pickBestByTable(StateList, ActionList, Action) :-
 	findall([Act, Val], (qValueLearned(StateList, Act, Val, _Count), member(Act, ActionList)), ListOfPairs),
