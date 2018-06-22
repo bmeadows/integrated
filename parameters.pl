@@ -9,7 +9,18 @@
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% System interface settings %%%%%%%%%%%
+% Contents
+% 1. System interface settings
+% 2. System parameters
+% 3. MDP traversal parameters
+% 4. Q-Learning parameters
+% 5. Axiom construction parameters
+% 6. Speculative parameters
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% 1. System interface settings %%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % This option pipes the system's output to a specified file instead of the terminal.
@@ -27,7 +38,7 @@ registers(true).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%% System parameters %%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 2. System parameters %%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Provide a fixed seed the system's random number generator (e.g., for debugging purposes) or allow selection of a random seed (e.g., for experimental trials).
@@ -56,7 +67,7 @@ domain_relevance(cached).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%% MDP traversal parameters %%%%%%%%%%%
+%%%%%%%%% 3. MDP traversal parameters %%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Amount of reduction in variance required to initiate splitting a leaf in the BDT.
@@ -94,7 +105,7 @@ exploration_before_splitting(0.1).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% Q-Learning parameters %%%%%%%%%%%%%
+%%%%%%%%%%% 4. Q-Learning parameters %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Specify how to calculate Q-values for records stored below the leaf.
@@ -120,7 +131,7 @@ reward_neg(0.0).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%% Axiom construction parameters %%%%%%%%%
+%%%%%%% 5. Axiom construction parameters %%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Number of both normal and negated literals a candidate axiom under construction may possess.
@@ -137,15 +148,10 @@ number_of_filters(10).
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%% Speculative parameters %%%%%%%%%%%%
+%%%%%%%%%% 6. Speculative parameters %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Included for future - do not change.
-% The system only supports closed-world relational learning.
+% Included for future usage - do not change.
+% This version of the system only supports closed-world relational learning.
 closed_world(true).
 rrl(true).
-
-
-
-
-

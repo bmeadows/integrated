@@ -11,11 +11,10 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contents
 % 1. Reduction to relevant signature
-% 2. Accessing relevance information
-% 3. Noise simulation
-% 4. Operations on the state
-% 5. Action applicability
-% 6. Initial directives
+% 2. Noise simulation
+% 3. Operations on the state
+% 4. Action applicability
+% 5. Initial directives
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -23,27 +22,28 @@
 %%%%%% 1. Reduction to relevant signature %%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Function that reduces signature to relevant signature.
 precalculate :-
 	statistics(process_cputime, StartCPU),
-	writef('1/7. Precalculating.\n'),
+	writef('(1/7). Precalculating.\n'),
 	retractall(objrel(_)),
 	domainGoalAction(Action),
-	writef('2/7. Target action.\n'),
-	setRandomInitialStaticConfiguration, % Source of the current error with this component. This randomly sets static attributes!
-	writef('3/7. Randomised.\n'),
+	writef('(2/7). Target action.\n'),
+	setRandomInitialStaticConfiguration, % Note - Source of an outstanding error with this component. (This randomly sets static attributes!)
+	writef('(3/7). Randomised.\n'),
 	findRelevantFluentSuperset(Action, Lits),
-	writef('4/7. Superset found.\n'),
+	writef('(4/7). Superset found.\n'),
 	sort(Lits,L111), print(L111), nl, nl,
 	adjustForRelevance(Lits, ReturnedTests, ReturnedObjectSet), % At this point the inconsistent behaviour is already observable.
-	writef('5/7. Adjusted for relevance.\n'),
+	writef('(5/7). Adjusted for relevance.\n'),
 	assert(allValidTests(ReturnedTests)),
-	writef('6/7. Target action.\n'),
+	writef('(6/7). Target action.\n'),
 	calculateConfigSpaceSize(ReturnedObjectSet),
-	writef('7/7. Calculated config size.\n'),
+	writef('(7/7). Calculated config size.\n'),
 	retractall(objrel(_)),
 	statistics(process_cputime, EndCPU),
 	CPUDIFF is EndCPU - StartCPU,
-	writef('CPU: '), print(CPUDIFF), nl.
+	writef('CPU time for precalculation: '), print(CPUDIFF), nl.
 
 % For each valid physical state from which the target ground action is permissible, find the relevant literals to that <physical state, action> pair.
 findRelevantFluentSuperset(Action, Lits) :-
@@ -127,7 +127,6 @@ addAllRelevantActions(ObjectSet, Initial, Final) :-
 	assert(usableActionList(RelActions)),
 	append(Initial,RelActions,Final).
 
-
 % 1. Have determined which objects are relevant, 'ObjectSet'.
 % 2. All properties of a relevant object are relevant.
 % 3. For each property that CAN pertain to an object, it is guaranteed that the function will give SOME value.
@@ -167,19 +166,7 @@ multiply_out_list([A|B], Working, Final) :-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%% 2. Accessing relevance information %%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-getCurrentRelevantConfigurationOfAttributes(RelevantConfigList) :-
-	allValidTests(Tests), % Includes actions and fluents, too
-	findall(attr(Attr),
-		(currentState(attr(Attr)), member(attr(Attr), Tests)), % Note that Tests *already* has the attr() wrappers (amongst others)
-		AttrList),
-	sort(AttrList,RelevantConfigList).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%% 3. Noise simulation %%%%%%%%%%%%%%
+%%%%%%%%%%%%% 2. Noise simulation %%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 applyNoiseWhereAppropriate :-
@@ -234,8 +221,17 @@ retracteachfromstate([A|B]) :- retract_facts_only(currentState(A)), retracteachf
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%% 4. Operations on the state %%%%%%%%%%
+%%%%%%%%%% 3. Operations on the state %%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Accessing relevance information:
+% Returns all static elements of current state that are valid BDT tests, i.e., relevant.
+getCurrentRelevantConfigurationOfAttributes(RelevantConfigList) :-
+	allValidTests(Tests), % Includes actions and fluents, too
+	findall(attr(Attr),
+		(currentState(attr(Attr)), member(attr(Attr), Tests)), % Note that Tests *already* has the attr() wrappers (amongst others)
+		AttrList),
+	sort(AttrList,RelevantConfigList).
 
 resetStateInPrincipledWay :-
 	setObservedUnexpectedState,
@@ -349,7 +345,7 @@ currentState_overt_belief_only(X) :-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%% 5. Action applicability %%%%%%%%%%%%
+%%%%%%%%%%% 4. Action applicability %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 validAction(A) :- actionDescription(A, Vars, Sorts), sortsHoldTrue(Sorts, Vars), not(impossible_if(A,_ID)).
@@ -372,7 +368,7 @@ sortsHoldTrue([Sort|Tail1], [Var|Tail2]) :-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%% 6. Initial directives %%%%%%%%%%%%
+%%%%%%%%%%%%% 5. Initial directives %%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 :- establishGoalState.

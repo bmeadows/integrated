@@ -17,12 +17,27 @@ last_split_at/1, sumQCollector/1, countCollector/1, random_sampling_count/1, num
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Contents
 % 1. Dependencies
-% 2. Counters
+% 2. Numeric counters
 % 3. Structural predicates
 % 4. Running the system
 % 5. Output functions
 % 6. Debug registers
 % 7. Q-RRL functionality
+% 8. BDT leaf values
+% 9. Enacting in state
+% 10. Generalisation
+% 11. Construct generalised examples
+% 12. Construct candidate axioms
+% 13. Use generated candidates
+% 14. Refine candidates
+% 15. Report candidates
+% 16. Oracle filtering
+% 16(a). Oracle filtering - Nonvirtuous
+% 16(b). Oracle filtering - Virtuous
+% 17. Reporting outputs
+% 18. Q-learning episodes
+% 19. Tree operations
+% 20. Action selection
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
@@ -39,7 +54,7 @@ last_split_at/1, sumQCollector/1, countCollector/1, random_sampling_count/1, num
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%% 2. Counters %%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 2. Numeric counters %%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 split_count(0).
@@ -277,7 +292,7 @@ printTreeSpaces(Count) :-
 	N is Count - 1,
 	printTreeSpaces(N).
 
-%%%%% %%%%% %%%%% %%%%% %%%%% %%%%% 
+%%%%% %%%%% %%%%% %%%%% %%%%% %%%%% %%%%%
 % Not used for tree printing. Useful for debugging.
 printLeafExamples(ID, Count) :-
 	printTreeSpaces(Count),
@@ -292,7 +307,7 @@ printLeafExamples(ID, Count) :-
 	print_minor('>\n'),
 	fail.
 printLeafExamples(_, _) :- !.
-%%%%% %%%%% %%%%% %%%%% %%%%% %%%%% 
+%%%%% %%%%% %%%%% %%%%% %%%%% %%%%% %%%%%
 
 print_minor_list(List) :-
 	print_minor('{'),
@@ -448,17 +463,13 @@ performEpisodesForOneConfig :-
 	enter_register(ep_steps),
 	do_steps_in_episode, % Main function
 	exit_register(ep_steps),
-	
 	enter_register(tree_split_checking),
-
 	total_config_count(NConfig),
 	number_of_configs_to_search(CTSe),
 	Frac is NConfig/CTSe,
 	exploration_before_splitting(Exp),
 	(Frac >= Exp -> checkForTreeSplits ; true), % Tree splitting is delayed if exploration_before_splitting is set higher than zero
-	
 	exit_register(tree_split_checking),
-	
 	printTreeAtEndOfEpisode,
 	!,
 	Y is X+1,
@@ -562,7 +573,133 @@ checkDiffsForAllLeaves(C1, C2, [ID|Tail]) :-
 	!,
 	checkDiffsForAllLeaves(C1, C2, Tail).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% 8. BDT leaf values %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% For EACH current leaf node in the BDT, consider extending by splitting that leaf.
+checkForTreeSplits :-
+	affectedLeavesThisConfig(ListToTest),
+	(is_set(ListToTest) -> true ; trace),
+	!,
+	checkListForTreeSplits(ListToTest),
+	!.
+	
+checkListForTreeSplits([]) :-
+	!.
+checkListForTreeSplits([LeafID|Tail]) :-
+	% If no variance, do nothing.
+	calculateVarianceAtLeafNode(LeafID, TotalVariance),
+	checkListForTreeSplits_inner([LeafID|Tail], TotalVariance).
+
+% Final clause - catch case - not enough variance improvement to split at all
+checkListForTreeSplits([_LeafID|Tail]) :-
+	!,
+	enter_register('tree_split_checking:clause3'),
+	(no_split_count(CurrentCount), NewCount is CurrentCount+1, retractall(no_split_count(_)), assert(no_split_count(NewCount))),
+	exit_register('tree_split_checking:clause3'),
+	checkListForTreeSplits(Tail).
+
+checkListForTreeSplits_inner([_LeafID|Tail], TotalVariance) :-
+	TotalVariance =< 0.0,
+	!,
+	enter_register('tree_split_checking:clause1'),
+	(no_split_count(CurrentCount), NewCount is CurrentCount+1, retractall(no_split_count(_)), assert(no_split_count(NewCount))),
+	exit_register('tree_split_checking:clause1'),
+	checkListForTreeSplits(Tail).
+
+checkListForTreeSplits_inner([LeafID|Tail], TotalVariance) :-
+	enter_register('tree_split_checking:clause2'),
+	% Get list of unique possible tests	
+	findall(	Literal,
+				(leaf_stored_example(LeafID, Content, _, _, _, _C), member(Literal, Content)),
+				List1),
+	sort(List1, List2),
+		
+	findall(	[ProspectiveTest, MeanReduction, YesReduction, NoReduction],
+				(
+					member(ProspectiveTest, List2),
+					calculateYesNoVariancesForTest(LeafID, ProspectiveTest, VarianceYes, VarianceNo),
+					% We already know TotalVariance > 0 otherwise the previous clause would have kicked in
+					YesReduction is TotalVariance - VarianceYes,
+					NoReduction is TotalVariance - VarianceNo,
+					MeanReduction is (YesReduction + NoReduction)/2
+				),
+				ListOfTestPossibilities
+				),
+	% First, pick the lowest-variance test where there is some sufficient reduction in variance
+		
+	amountVarianceReductionRequired(AVRR),
+	
+	findall( Test,
+		(
+		member(SelectableTest, ListOfTestPossibilities),
+		SelectableTest = [Test, MeanReduction, YesReduction, NoReduction],
+		once((YesReduction > 0 ; NoReduction  > 0)),
+		MeanReduction  > AVRR,
+		not( (member(OtherTest, ListOfTestPossibilities), OtherTest \= SelectableTest, OtherTest = [_, OtherMean, _, _], OtherMean > MeanReduction) )
+		),
+			AllSelectableTests),
+		
+	% (Simply picking the first test alphabetically would cause problems)
+	random_member(ChosenTest, AllSelectableTests),
+	
+	splitNode(LeafID, ChosenTest),
+	
+	affectedLeavesThisConfig(ListToTestThatNeedsRevising),
+	select(LeafID, ListToTestThatNeedsRevising, NewAffectedLeafList),
+	retractall(affectedLeavesThisConfig(ListToTestThatNeedsRevising)),
+	asserta(affectedLeavesThisConfig(NewAffectedLeafList)),
+	exit_register('tree_split_checking:clause2'),
+	!,
+	checkListForTreeSplits(Tail).
+
+% Helps to establish Q-value convergence by storing the Q-values for touched leaves
+% At end of each episode, will find the currently highest-value leaves and check whether those values did not change by more than some small percentage over the last N episodes
+storeEpisodicValueMaxes :-
+	% 1. Get list of leaf nodes touched this config
+	affectedLeavesThisConfig(List),
+	% 2. Store current predicted Q-value for each of those nodes in episode_high_val
+	episode_count(EC),
+	storeEpisodicValues(EC, List).
+	
+storeEpisodicValues(_, []) :- !.
+storeEpisodicValues(EC, [A|B]) :-
+	not(leaf(A)), % Might no longer be a leaf if it has been split since it was added to the list.
+	!,
+	storeEpisodicValues(EC, B).
+storeEpisodicValues(EC, [A|B]) :-
+	predicted_q_value(A, Val, _),
+	assert(episode_high_val(EC, A, Val)),
+	storeEpisodicValues(EC, B).	
+
+% To guarantee convergence to the true Q-value, slowly decrease the learning rate parameter 'gamma' (current_learning_rate_parameter) over time.
+% Although in practice, it's often sufficient to simply use a small gamma.
+% The method is: Each iteration/episode, current_learning_rate_parameter -= initial_learning_rate_parameter/(totalnumruns*2 +1).
+% So eventually it reaches half.
+updateLearningValue :-
+	vary_learning_rate(false),
+	!.
+updateLearningValue :-
+	vary_learning_rate(true),
+	!,
+	change_learning_rate.
+
+change_learning_rate :-
+	initial_num_of_episodes(A),
+	initial_learning_rate_parameter(X),
+	current_learning_rate_parameter(Y),
+	Val1 is (A * 2) + 1, % Doubled for now so it simply narrows down to half the original
+	Val2 is X / Val1,
+	New is Y - Val2,
+	retractall(current_learning_rate_parameter(_)),
+	assert(current_learning_rate_parameter(New)).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 9. Enacting in state %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Case 1: e.g. positive affordance learning. An executability condition must be checked before the action's transition.
 % If (a) the action is the target action, (b) the particular executability condition holds, and (c) the action's outcome matches the goal state, get positive reward.
@@ -616,7 +753,10 @@ applyActionToStateAndUpdateHistory(Action) :-
 	nl_major,
 	trace.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%% 10. Generalisation %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 doGeneralisation :-
 	enter_register('generalisation:1makeexamples'),
@@ -683,6 +823,11 @@ doGeneralisation :-
 	
 	!.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% 11. Construct generalised examples %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Transform all leaves into "path records" of tests from leaf to root, keeping only attributes and actions.
 makeGeneralisedExamples :-
 	% Pick any leaf L
@@ -703,6 +848,33 @@ makeGeneralisedExamples :-
 	not( leaf(_) ),
 	!.
 
+getStateActionInfoOnPath(LeafID, SortedStateNeg, SortedStatePos) :-
+	recursiveGetStateActionInfoOnPath(LeafID, [], SortedStateNeg, [], SortedStatePos).
+
+% Base case
+recursiveGetStateActionInfoOnPath(Node, CurrentStateNeg, ReturnSortedStateNeg, CurrentStatePos, ReturnSortedStatePos) :-
+	root(Node),
+	sort(CurrentStateNeg, ReturnSortedStateNeg),
+	sort(CurrentStatePos, ReturnSortedStatePos),
+	!.
+
+% Non-root: leaf or intermediate node (note the leaf=root combination is covered above)
+% This is a positive or negative example of parent 'action', 'fluent', or 'attr' test.
+recursiveGetStateActionInfoOnPath(Node, CurrentStateNeg, ReturnSortedStateNeg, CurrentStatePos, ReturnSortedStatePos) :-
+	not(root(Node)),
+	parent(Node, Node2),
+	(test(Node2, Test) ; (println_major('recursiveGetStateActionInfoOnPath failed: no test\n'), trace, fail)),
+	!,
+	(
+		child_y(Node2, Node)
+		->
+		(append(CurrentStatePos,[Test],CurrentStatePos2), CurrentStateNeg2 = CurrentStateNeg)
+		;
+		(append(CurrentStateNeg,[Test],CurrentStateNeg2), CurrentStatePos2 = CurrentStatePos) % assume child_n
+	),
+	!,
+	recursiveGetStateActionInfoOnPath(Node2, CurrentStateNeg2, ReturnSortedStateNeg, CurrentStatePos2, ReturnSortedStatePos).
+
 makeExamplePathRecords(ID, StateNeg, StatePos) :-
 	findall(X1, (member(X1, StatePos), X1 \= action(_) ), Pos1),
 	findall(X2, (member(X2, StateNeg), X2 \= action(_) ), Neg1),
@@ -719,8 +891,6 @@ makeExamplePathRecords(ID, StateNeg, StatePos) :-
 	;
 		addMatchingSubsetAsPathRecordConditionally(ID, Literals, Target)
 	).
-	
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Key here is to go through and do it separately for each different configuration ID
 
@@ -753,8 +923,6 @@ addMatchingSubsetAsPathRecordConditionally(ID, _, _) :-
 	assert(leaf_generalised(ID,-1))
 	;
 	true.
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 addANewPathRecord(_, _, _, []) :- !.
 addANewPathRecord(_, _, [[],[]], _) :- !.
@@ -784,10 +952,11 @@ amassPathRecord(ID, ConfigID, LeafExamples) :-
 	fail.
 amassPathRecord(_,_,_) :- !.
 
-subsetp([], []).
-subsetp([E|Tail], [E|NTail]):- subsetp(Tail, NTail).
-subsetp([_|Tail], NTail):- subsetp(Tail, NTail).
-  
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%% 12. Construct candidate axioms %%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % Combine path records, transforming the generalised forms into 'semifinalexample', and delete path records.
 % Note the examples used have no fluent information (which would have been all that distinguished some of them).
 % Hence we now expect to have duplicates in our semifinalexample([S1,S2], Q, Worst, Count) entries.
@@ -812,7 +981,11 @@ constructCandidateAxioms :-
 	% 5. Repeat
 	!,
 	constructCandidateAxioms.
-	
+
+subsetp([], []).
+subsetp([E|Tail], [E|NTail]):- subsetp(Tail, NTail).
+subsetp([_|Tail], NTail):- subsetp(Tail, NTail).
+
 % Base case: Done
 updateCandidateAxioms([], _S, _C, _ID, _CID) :- !.
 
@@ -849,36 +1022,10 @@ updateCandidateAxioms([A|B], Sum, Count, ID, ConfigID) :-
 % Catch case, only reached if an error occurs
 updateCandidateAxioms(_, _, _, _, _) :- trace.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-getStateActionInfoOnPath(LeafID, SortedStateNeg, SortedStatePos) :-
-	recursiveGetStateActionInfoOnPath(LeafID, [], SortedStateNeg, [], SortedStatePos).
-
-% Base case
-recursiveGetStateActionInfoOnPath(Node, CurrentStateNeg, ReturnSortedStateNeg, CurrentStatePos, ReturnSortedStatePos) :-
-	root(Node),
-	sort(CurrentStateNeg, ReturnSortedStateNeg),
-	sort(CurrentStatePos, ReturnSortedStatePos),
-	!.
-
-% Non-root: leaf or intermediate node (note the leaf=root combination is covered above)
-% This is a positive or negative example of parent 'action', 'fluent', or 'attr' test.
-recursiveGetStateActionInfoOnPath(Node, CurrentStateNeg, ReturnSortedStateNeg, CurrentStatePos, ReturnSortedStatePos) :-
-	not(root(Node)),
-	parent(Node, Node2),
-	(test(Node2, Test) ; (println_major('recursiveGetStateActionInfoOnPath failed: no test\n'), trace, fail)),
-	!,
-	(
-		child_y(Node2, Node)
-		->
-		(append(CurrentStatePos,[Test],CurrentStatePos2), CurrentStateNeg2 = CurrentStateNeg)
-		;
-		(append(CurrentStateNeg,[Test],CurrentStateNeg2), CurrentStatePos2 = CurrentStatePos) % assume child_n
-	),
-	!,
-	recursiveGetStateActionInfoOnPath(Node2, CurrentStateNeg2, ReturnSortedStateNeg, CurrentStatePos2, ReturnSortedStatePos).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%% 13. Use generated candidates %%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 makeCandidateTree :-
 	println_medium('Finalising all semifinalexample candidates\n'),
@@ -905,8 +1052,6 @@ reduceToHighQualityCandidates :-
 		assert(finalexample([Yes,No], QValueSum, WorstQValue, ExampleCount, SupportingConfigsList)) ; true),
 	!,
 	reduceToHighQualityCandidates.
-
-%%%%%%%%%%%%%%%%%
 
 % Next cycle through all, adding the values of random examples to the appropriate candidates
 
@@ -943,6 +1088,35 @@ establishSupportForCandidates :-
 	length(AllExamplesList, AELSize),
 	print_medium('Total set of samples to draw from: '), println_medium(AELSize),
 	supportWithRandomExamples(AllExamplesList).
+
+% Note a node is its own ancestor
+getAncestorTests(Node, List) :-
+	recursiveGetAncestorTests(Node,[],List).
+% root & leaf
+recursiveGetAncestorTests(Node, _, []) :-
+	root(Node),
+	leaf(Node),
+	!.
+% root & !leaf
+recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
+	root(Node), % but not a leaf...
+	(test(Node, T) ; (println_major('recursiveGetAncestorTests 1 failed: no test\n'), trace, fail)),
+	test(Node, T),
+	!,
+	append(WorkingList,[T],ReturnList).
+% !root & leaf
+recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
+	parent(Node, Node2),
+	leaf(Node),
+	!,
+	recursiveGetAncestorTests(Node2, WorkingList, ReturnList).
+% !root & !leaf
+recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
+	parent(Node, Node2),
+	(test(Node, T) ; (println_major('recursiveGetAncestorTests 2 failed: no test\n'), trace, fail)),
+	!,
+	append(WorkingList,[T],NewList),
+	recursiveGetAncestorTests(Node2, NewList, ReturnList).
 
 % Base case: Done
 supportWithRandomExamples(_) :-
@@ -1039,7 +1213,10 @@ addToAllCandidates([A|B], AddedValue, ConfigID) :-
 	!,
 	addToAllCandidates(B, AddedValue, ConfigID).
 
-%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% 14. Refine candidates %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Finally, remove cases that are still supported by only one example.
 finaliseCandidates :-
@@ -1065,10 +1242,6 @@ changeExamplesToCandidates :-
 	% 3. Recursive call
 	changeExamplesToCandidates.
 changeExamplesToCandidates.
-
-
-%%%%%%%%%%%%%%%%%
-
 
 % 'Causal law: [Effects] :- Action, [Conditions].'
 liftCandidates :-
@@ -1152,9 +1325,7 @@ liftCandidates :-
 
 liftCandidates.
 
-
-% % % Helpers for lifting
-
+% Helpers for lifting
 concat_with_two_possibly_empty_strings(In, '', '', In) :- !.
 concat_with_two_possibly_empty_strings(In, '', String2, Out) :- !, concat(In, String2, Out).
 concat_with_two_possibly_empty_strings(In, String1, '', Out) :- !, concat(In, String1, Out).
@@ -1191,7 +1362,6 @@ create_comma_separated_strings_recursive([A|B],CurrentString,Final) :-
 	concat(CurrentString, ', ', Next),
 	concat(Next, A, Next2),
 	create_comma_separated_strings_recursive(B,Next2,Final).
-
 
 % InputListOfNListsOfTerms    : an arbitrary list of sublists, each sublist containing an arbitrary number of terms
 % OutputListOfNListsOfStrings : a list of sublists following the same structure, each sublist containing terms translated into strings
@@ -1282,6 +1452,11 @@ replace_all_instances_in_string(TargetConst, TargetConst_UPPER, WorkingString, R
 	replace_all_instances_in_string(TargetConst, TargetConst_UPPER, New, Return).
 replace_all_instances_in_string(_, _, X, X) :- !.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% 15. Report candidates %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 adjustAxiomsWithMean :-
 	not(candidate_axiom(raw,_,[_,_],_,_,_,_)),
 	!.
@@ -1331,8 +1506,6 @@ rankFinalAxioms(Min, Rank) :-
 	exit_register('generalisation:7sortb3'),
 	!,
 	rankFinalAxioms(Min, NewRank).
-	
-% % % % % % % % % %
 
 finalAxiomQualityImprovement :-
 	checkCandidateAxiom(1),
@@ -1389,6 +1562,11 @@ reRankAxioms(CurrentLargestRank) :-
 % Base case
 reRankAxioms(_) :- !.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 16. Oracle filtering %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 removeArtificialNoiseGeneratorForChecking :-
 	retract(noiseChancePercent(_)),
 	assert(noiseChancePercent(0)).
@@ -1406,7 +1584,6 @@ checkTopCandidatesWithOracle :-
 	extractAndReportTopAxioms(0),
 	number_of_filters(Num),
 	recursiveCheckTopCandidates(1, Num).
-		
 
 recursiveCheckTopCandidates(Current, Finish) :-
 	Current > Finish,
@@ -1467,7 +1644,6 @@ oracleFilterCandidates_by_rule_type(N,Act,True,False,Mean,Worst,C,Configs) :-
 		true
 	).
 
-
 systemThinksActionWillFailInDomain :-
 	domainGoalAction(Action),
 	not(validAction(Action)), % System already believes it will fail in the current circumstances
@@ -1479,22 +1655,10 @@ actionActuallyHasUnexpectedOutcomeInDomain :-
 	goalAchieved(GOAL), % 2. Therefore this is positive
 	!.
 
-storeCurrentStateAndConfig(List) :-
-	findall(N, currentState(N), List).
 
-restoreStateAndConfig(List) :-
-	retract_facts_only(currentState(_)),
-	restoreFromList(List).
-
-restoreFromList([]) :- !.
-restoreFromList([A|B]) :- 
-	assert(currentState(A)),
-	restoreFromList(B).
-
-
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% 16(a). Oracle filtering - Nonvirtuous %%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Each time this is called, it repeatedly
 % 1. Generates a random new state
@@ -1529,10 +1693,9 @@ setAndTryNonvirtuousState_sub_function(Act,ID,True,False) :-
 	).
 
 
-	
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%% 16(b). Oracle filtering - Virtuous %%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Each time this is called, it repeatedly
 % 1. Generates a random new state until it finds one where the target action succeeds
@@ -1541,7 +1704,7 @@ setAndTryNonvirtuousState_sub_function(Act,ID,True,False) :-
 setAndTryVirtuousState(True,False) :-
 	resetStateAtRandom,
 	setRandomInitialStaticConfiguration,
-	storeCurrentStateAndConfig(List),
+	findall(N, currentState(N), List), % Current state
 	!,
 	((unfixable_virtuous_state_deviation(False) ; systemThinksActionWillFailInDomain ; actionActuallyHasUnexpectedOutcomeInDomain) -> setAndTryVirtuousState(True,False) ; 
 		(
@@ -1553,6 +1716,15 @@ setAndTryVirtuousState(True,False) :-
 		( ((Outcome = false) ; stateConstraintsViolated) -> setAndTryVirtuousState(True,False) ; true)
 		)
 	).
+
+restoreStateAndConfig(List) :-
+	retract_facts_only(currentState(_)),
+	restoreFromList(List).
+
+restoreFromList([]) :- !.
+restoreFromList([A|B]) :- 
+	assert(currentState(A)),
+	restoreFromList(B).
 
 % Without this check before adjustVirtuousState(True,False), it will loop infinitely as it 'retracts' a derived belief and then the belief remains true in the state because it's derived
 unfixable_virtuous_state_deviation(False) :-
@@ -1612,11 +1784,40 @@ deleteAllLits([A|B]) :-
 	retract_facts_only(currentState(A)),
 	deleteAllLits(B).
 
+% Term is either attr( ) or fluent( )
+get_all_alternative_domain_tests(Term, ReturnList) :-
+	findall(List,
+			permitted_domain_test_alternatives(Term, List),
+			UnflattenedList),
+	flatten(UnflattenedList, FlatList),
+	sort(FlatList, ReturnList),
+	(ReturnList == [] -> (writef('Error: get_all_alternative_domain_tests failed due to bad argument.'), trace) ; true).
 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
-% % % % % % % % % % % % % % % % % % % % % % % % % 
+% Note that to avoid complications, e.g. loc(x,y) will only substitute for loc(x,z), not loc(w,y)!
+% Anything else must be set up within the domain using permitted_domain_test_alternatives/2.
+permitted_domain_test_alternatives(fluent(ContentTerm), ReturnList) :-
+	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
+	SomeNumberOfArgs > 1,
+	arg(1, ContentTerm, FirstArg),
+	!,
+	findall(	N, % Find all fluent attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
+				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = fluent(N2), valid(N), N2 \= ContentTerm),
+				ReturnList
+	).
+permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
+	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
+	SomeNumberOfArgs > 1,
+	arg(1, ContentTerm, FirstArg),
+	!,
+	findall(	N, % Find all static attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
+				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = attr(N2), valid(N), N2 \= ContentTerm),
+				ReturnList
+	).
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%% 17. Reporting outputs %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 batchReportingOutputs(Index) :-
 	% If the batch support files exist (have been asserted), then output to them appropriately.
@@ -1691,7 +1892,6 @@ reportFP(Term, Stream, Prefix) :-
 reportTP(Term, Stream) :-
 	write(Stream, Term),
 	write(Stream, '\n').
-	
 
 extractAndReportTopAxioms('lifted') :-
 	writef('Number of oracle passes: final, lifted\n'),
@@ -1715,7 +1915,10 @@ extractAndReportTopAxioms(NToReport) :-
 
 extractAndReportTopAxioms(_).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%% 18. Q-learning episodes %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 do_steps_in_episode :-
 	one_step.
@@ -1844,9 +2047,7 @@ one_step :-
 	exit_register('ep_steps:main'),
 	one_step.
 
-	
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+/*
 pickBestByTable(StateList, ActionList, Action) :-
 	findall([Act, Val], (qValueLearned(StateList, Act, Val, _Count), member(Act, ActionList)), ListOfPairs),
 	( (ListOfPairs == []) -> random_member(Action, ActionList) ;
@@ -1873,11 +2074,11 @@ updateStoredExampleWithQV(StateList, Action, RewardValue, FutureValue) :-
 	Alpha is (1/Count2),
 	NewQValue is CurrentQV + (Alpha * (RewardValue + (Gamma * FutureValue) - CurrentQV)),
 	assert(qValueLearned(StateList, Action, NewQValue, Count2)).
+*/
 
-	
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-%%% TREE OPERATIONS %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 19. Tree operations %%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 splitNode(ID, Test) :-
 	(leaf(ID) -> true ; (println_major('Error: Split failed\n'), trace, fail)),
@@ -1953,7 +2154,6 @@ touchLeaf(ID) :-
 	append(List, [ID], New),
 	assert(affectedLeavesThisConfig(New)),
 	!.
-
 
 updatePredictedQValue(LeafID, RewardValue, FutureValue) :-
 	predicted_q_value(LeafID, CurrentQV, Count1),
@@ -2037,11 +2237,6 @@ moveExamplesDown(NodeID, ChildYes, ChildNo, NodeTest) :-
 	moveExamplesDown(NodeID, ChildYes, ChildNo, NodeTest).
 moveExamplesDown(_NodeID, _ChildYes, _ChildNo, _NodeTest) :- !.
 
-	
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
 calculateVarianceAtLeafNode(ID, Variance) :-
 	enter_register('calculate_variance_at_leaf'),
 	enter_register('calculate_variance_at_leaf:sums'),
@@ -2094,9 +2289,6 @@ calculateYesNoVariancesForTest(LeafID, ProspectiveTest, VarianceY, VarianceN) :-
 	findVariance(CountY, SumQY, SumSquareQY, VarianceY),
 	findVariance(CountN, SumQN, SumSquareQN, VarianceN).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 makeNewRoot :-
 	retractall(root(_)),
 	createNode(ID),
@@ -2114,6 +2306,11 @@ makeNewId(ID) :-
 	ID2 is ID + 1,
 	retractall(currentNodeId(_)),
 	asserta(currentNodeId(ID2)).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%% 20. Action selection %%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %	Find all leaves whose ancestor chain
 %		(a) is a (partial) match for the current state, and
@@ -2139,7 +2336,6 @@ get_best_by_binary_tree_estimate(ValidActionList, BestAction, BestValue) :-
 	)
 	),
 	exit_register('ep_steps:getBestByBDT:part2').
-	
 
 % (If list is empty, assume default low/negative value)
 getHighestQValueForAnyActionFromCurrentState([], N) :- reward_neg(N), !.
@@ -2162,8 +2358,6 @@ getHighestQValueForAnyActionFromCurrentState(ActionList, BestValue) :-
 	;
 	max_list(ListOfVals,BestValue)).
 	
-%%%%%
-
 getAllActionQPairs(ValidActionList, ListOfPairs) :- 
 	policySearch(ValidActionList),
 	%
@@ -2239,9 +2433,11 @@ recursiveBDTSearch(ValidActionList, [FringeElement|Tail]) :-
 	!,
 	recursiveBDTSearch(ValidActionList, NewFringe).
 
-	%%%%
-	
-getAllActionQPairs_SECONDTRY(ValidActionList, ListOfPairs) :-
+% Note there's, necessarily, no way to end up with two actions in the same path:
+% once there is an action in the path from root to (current) leaf, then every test for any other action will never partition the examples, so the leaf will never split on that test.
+
+/*
+getAllActionQPairs_DEPRECATED(ValidActionList, ListOfPairs) :-
 	enter_register('ep_steps:getBestByBDT:?1'),
 	findall(	[StateNeg, StatePos, Value],
 				( leaf(ID), enter_register('ep_steps:getBestByBDT:?1-INNER'), enter_register('ep_steps:getBestByBDT:?1-getpath'), getStateActionInfoOnPath(ID, StateNeg, StatePos), exit_register('ep_steps:getBestByBDT:?1-getpath'), predicted_q_value(ID, Value, _), exit_register('ep_steps:getBestByBDT:?1-INNER') ),
@@ -2262,7 +2458,8 @@ noneAreInCurrentState([]).
 noneAreInCurrentState([H|T]) :-	
 	not(currentState(H)),
 	noneAreInCurrentState(T).
-	
+*/
+/*
 getAllActionQPairs_ORIGINAL_VERSION(ValidActionList, ListOfPairs) :-
 	findall(	[Action, Value],
 				matchingAncestorChain(ValidActionList, Action, Value),
@@ -2286,44 +2483,6 @@ matchingAncestorChainX(ValidActionList, Action, Value) :-
 	exit_register('ep_steps:getBestByBDT:findall:aChain:all'),
 	predicted_q_value(ID, Value, _),
 	exit_register('ep_steps:getBestByBDT:findall:aChain').
-	
-/*	1. Pass in set AL
-	2. Take any leaf
-	3. Get set T of all its ancestors' tests
-	4. Find any action in T
-	5. Check it is in AL
-	6. Check everything that is in T also currently holds in the world (or is an action)
-*/
-	
-% Note a node is its own ancestor
-getAncestorTests(Node, List) :-
-	recursiveGetAncestorTests(Node,[],List).
-
-% root & leaf
-recursiveGetAncestorTests(Node, _, []) :-
-	root(Node),
-	leaf(Node),
-	!.
-% root & !leaf
-recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
-	root(Node), % but not a leaf...
-	(test(Node, T) ; (println_major('recursiveGetAncestorTests 1 failed: no test\n'), trace, fail)),
-	test(Node, T),
-	!,
-	append(WorkingList,[T],ReturnList).
-% !root & leaf
-recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
-	parent(Node, Node2),
-	leaf(Node),
-	!,
-	recursiveGetAncestorTests(Node2, WorkingList, ReturnList).
-% !root & !leaf
-recursiveGetAncestorTests(Node, WorkingList, ReturnList) :-
-	parent(Node, Node2),
-	(test(Node, T) ; (println_major('recursiveGetAncestorTests 2 failed: no test\n'), trace, fail)),
-	!,
-	append(WorkingList,[T],NewList),
-	recursiveGetAncestorTests(Node2, NewList, ReturnList).
 
 allAreInCurrentStateOrActions([]).
 allAreInCurrentStateOrActions([A|B]) :-
@@ -2334,168 +2493,4 @@ allAreInCurrentStateOrActions([A|B]) :-
 	currentState(A),
 	!,
 	allAreInCurrentStateOrActions(B).
-
-% Note there's, necessarily, no way to end up with two actions in the same path:
-% once there is an action in the path from root to (current) leaf, then every test for any other action will never partition the examples, so the leaf will never split on that test.
-
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
-	
-% For EACH current leaf node in the BDT, consider extending by splitting that leaf.
-checkForTreeSplits :-
-	affectedLeavesThisConfig(ListToTest),
-	(is_set(ListToTest) -> true ; trace),
-	!,
-	checkListForTreeSplits(ListToTest),
-	!.
-	
-checkListForTreeSplits([]) :-
-	!.
-checkListForTreeSplits([LeafID|Tail]) :-
-	% If no variance, do nothing.
-	calculateVarianceAtLeafNode(LeafID, TotalVariance),
-	checkListForTreeSplits_inner([LeafID|Tail], TotalVariance).
-
-% Final clause - catch case - not enough variance improvement to split at all
-checkListForTreeSplits([_LeafID|Tail]) :-
-	!,
-	enter_register('tree_split_checking:clause3'),
-	(no_split_count(CurrentCount), NewCount is CurrentCount+1, retractall(no_split_count(_)), assert(no_split_count(NewCount))),
-	exit_register('tree_split_checking:clause3'),
-	checkListForTreeSplits(Tail).
-
-% % % % % %
-
-checkListForTreeSplits_inner([_LeafID|Tail], TotalVariance) :-
-	TotalVariance =< 0.0,
-	!,
-	enter_register('tree_split_checking:clause1'),
-	(no_split_count(CurrentCount), NewCount is CurrentCount+1, retractall(no_split_count(_)), assert(no_split_count(NewCount))),
-	exit_register('tree_split_checking:clause1'),
-	checkListForTreeSplits(Tail).
-
-checkListForTreeSplits_inner([LeafID|Tail], TotalVariance) :-
-	enter_register('tree_split_checking:clause2'),
-	% Get list of unique possible tests	
-	findall(	Literal,
-				(leaf_stored_example(LeafID, Content, _, _, _, _C), member(Literal, Content)),
-				List1),
-	sort(List1, List2),
-		
-	findall(	[ProspectiveTest, MeanReduction, YesReduction, NoReduction],
-				(
-					member(ProspectiveTest, List2),
-					calculateYesNoVariancesForTest(LeafID, ProspectiveTest, VarianceYes, VarianceNo),
-					% We already know TotalVariance > 0 otherwise the previous clause would have kicked in
-					YesReduction is TotalVariance - VarianceYes,
-					NoReduction is TotalVariance - VarianceNo,
-					MeanReduction is (YesReduction + NoReduction)/2
-				),
-				ListOfTestPossibilities
-				),
-	% First, pick the lowest-variance test where there is some sufficient reduction in variance
-		
-	amountVarianceReductionRequired(AVRR),
-	
-	findall( Test,
-		(
-		member(SelectableTest, ListOfTestPossibilities),
-		SelectableTest = [Test, MeanReduction, YesReduction, NoReduction],
-		once((YesReduction > 0 ; NoReduction  > 0)),
-		MeanReduction  > AVRR,
-		not( (member(OtherTest, ListOfTestPossibilities), OtherTest \= SelectableTest, OtherTest = [_, OtherMean, _, _], OtherMean > MeanReduction) )
-		),
-			AllSelectableTests),
-		
-	% (Simply picking the first test alphabetically would cause problems)
-	random_member(ChosenTest, AllSelectableTests),
-	
-	splitNode(LeafID, ChosenTest),
-	
-	affectedLeavesThisConfig(ListToTestThatNeedsRevising),
-	select(LeafID, ListToTestThatNeedsRevising, NewAffectedLeafList),
-	retractall(affectedLeavesThisConfig(ListToTestThatNeedsRevising)),
-	asserta(affectedLeavesThisConfig(NewAffectedLeafList)),
-	exit_register('tree_split_checking:clause2'),
-	!,
-	checkListForTreeSplits(Tail).
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Helps to establish Q-value convergence by storing the Q-values for touched leaves
-% At end of each episode, will find the currently highest-value leaves and check whether those values did not change by more than some small percentage over the last N episodes
-storeEpisodicValueMaxes :-
-	% 1. Get list of leaf nodes touched this config
-	affectedLeavesThisConfig(List),
-	% 2. Store current predicted Q-value for each of those nodes in episode_high_val
-	episode_count(EC),
-	storeEpisodicValues(EC, List).
-	
-storeEpisodicValues(_, []) :- !.
-storeEpisodicValues(EC, [A|B]) :-
-	not(leaf(A)), % Might no longer be a leaf if it has been split since it was added to the list.
-	!,
-	storeEpisodicValues(EC, B).
-storeEpisodicValues(EC, [A|B]) :-
-	predicted_q_value(A, Val, _),
-	assert(episode_high_val(EC, A, Val)),
-	storeEpisodicValues(EC, B).	
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-% To guarantee convergence to the true Q-value, slowly decrease the learning rate parameter 'gamma' (current_learning_rate_parameter) over time.
-% Although in practice, it's often sufficient to simply use a small gamma.
-% The method is: Each iteration/episode, current_learning_rate_parameter -= initial_learning_rate_parameter/(totalnumruns*2 +1).
-% So eventually it reaches half.
-updateLearningValue :-
-	vary_learning_rate(false),
-	!.
-updateLearningValue :-
-	vary_learning_rate(true),
-	!,
-	change_learning_rate.
-
-change_learning_rate :-
-	initial_num_of_episodes(A),
-	initial_learning_rate_parameter(X),
-	current_learning_rate_parameter(Y),
-	Val1 is (A * 2) + 1, % Doubled for now so it simply narrows down to half the original
-	Val2 is X / Val1,
-	New is Y - Val2,
-	retractall(current_learning_rate_parameter(_)),
-	assert(current_learning_rate_parameter(New)).
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% Term is either attr( ) or fluent( )
-get_all_alternative_domain_tests(Term, ReturnList) :-
-	findall(List,
-			permitted_domain_test_alternatives(Term, List),
-			UnflattenedList),
-	flatten(UnflattenedList, FlatList),
-	sort(FlatList, ReturnList),
-	(ReturnList == [] -> (writef('Error: get_all_alternative_domain_tests failed due to bad argument.'), trace) ; true).
-
-% Note that to avoid complications, e.g. loc(x,y) will only substitute for loc(x,z), not loc(w,y)!
-% Anything else must be set up within the domain using permitted_domain_test_alternatives/2.
-permitted_domain_test_alternatives(fluent(ContentTerm), ReturnList) :-
-	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
-	SomeNumberOfArgs > 1,
-	arg(1, ContentTerm, FirstArg),
-	!,
-	findall(	N, % Find all fluent attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
-				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = fluent(N2), valid(N), N2 \= ContentTerm),
-				ReturnList
-	).
-permitted_domain_test_alternatives(attr(ContentTerm), ReturnList) :-
-	functor(ContentTerm, ContentPred, SomeNumberOfArgs),
-	SomeNumberOfArgs > 1,
-	arg(1, ContentTerm, FirstArg),
-	!,
-	findall(	N, % Find all static attributes following the same pattern as the input argument, with same first argument, which are valid, and different to the input argument.
-				(functor(N2, ContentPred, SomeNumberOfArgs), arg(1, N2, FirstArg), N = attr(N2), valid(N), N2 \= ContentTerm),
-				ReturnList
-	).
-
+*/

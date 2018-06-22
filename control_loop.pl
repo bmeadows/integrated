@@ -367,6 +367,8 @@ perform_active_action_learning :-
 	assert(obs_ex_action_tagged(TextString2,Cons,ObsTime)),
 	retract(obs_ex_action(TextString,Cons,ObsTime)),
 	learnFromActionDesc(ExtractedAction), % Finally, perform learning over tagged text descriptions
+	prettyprint('Interactively learned:    '),
+	prettyprintln(ExtractedAction),
 	collate_demonstrated_exoaction_consequences(Cons,ListOfExtraObsToSetAtNewZero),
 	reset_ASP_history(ListOfExtraObsToSetAtNewZero).
 % Previously recursive... when multiple verbal cues could be stored.

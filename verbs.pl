@@ -2746,7 +2746,7 @@ vb(knock, [knocks, knocking, knocked]).
 vb(knot, [knots, knotting, knotted]).
 vb(know, [knows, knowing, knew, known]).
 vb(knuckle, [knuckles, knuckling, knuckled]).
-vb(label, [labels, labelling, labelled]).
+vb(label, [labels, labelling, labelled, labeling, labeled]).
 vb(labour, [labours, labouring, laboured]).
 vb(lace, [laces, lacing, laced]).
 vb(lacerate, [lacerates, lacerating, lacerated]).
