@@ -341,11 +341,12 @@ impossible_if(serve(_Robot, _Object, Person), 32) :-
 impossible_if(serve(Robot, Object, _Person), 33) :-
 	currentState(attr(surface(Object, brittle))),
 	currentState(attr(arm_type(Robot, pneumatic))). % Disaffordance to be elided for test #3
-impossible_if(serve(_Robot, Object, Person), 34) :- % This combines executability condition and its positive affordance...
+/*impossible_if(serve(_Robot, Object, Person), 34) :- % This combines executability condition and its positive affordance...
 	currentState(not(attr(role_type(Person, engineer)))),
 	currentState(not(fluent(item_status(Object,intact)))),
 	currentState(fluent(labelled(Object,false))). % Executability condition to be elided for test #2 ; both this and positive affordance to be elided for test #4
-
+													% Manually remove by commenting out.
+*/
 actionDescription(pickup(Robot, Object), [Robot, Object], [robot, item]).
 causal_law(pickup(Robot, Object), [fluent(loc(Robot,L))], [not(fluent(loc(Object, L))), fluent(in_hand(Robot, Object))]).
 impossible_if(pickup(Robot, Object), 40) :-
@@ -374,6 +375,7 @@ impossible_if(affix_label(Robot, Object), 52) :- % This combines executability c
 impossible_if(affix_label(Robot, Object), 53) :-
 	currentState(fluent(item_status(Object, damaged))),
 	currentState(attr(arm_type(Robot, pneumatic))). % Disaffordance to be elided in test #6
+														% Manually remove by commenting out.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -500,8 +502,13 @@ setRandomInitialStaticConfiguration :-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Define all target axioms to be learned by the qRRL system.
-% The first argument is the [Positive, Negative] literals of the target axiom.
-% The second argument gives a number identifying the target axiom, or ignore_axiom if it is not to be counted as a true positive. If no target is not matched it should give any other value.
+% These clauses are used only to for experimental trials, to determine the accuracy of the system's output.
+% domainAxiomClassifier/2.
+% - The first argument is the [Positive, Negative] literals of the target axiom.
+% - The second argument gives a number identifying the target axiom, or ignore_axiom if it is not to be counted as a true positive.
+%   If no target is not matched it should give any other value.
+% - The tail of each clause can refer to the target/goal, so as to not count accidental matches for actions that are not the subject of inquiry, 
+%   and must include a cut (only one interpretation of each system output).
 
 % 1. Causal law: Unlabelled object served to a sales person becomes labelled.
 domainAxiomClassifier([ [attr(role_type(P, sales))], [] ], 1) :- domainGoalAction(serve(rob1,_Ob,P)), !.
