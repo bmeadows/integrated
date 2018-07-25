@@ -382,6 +382,7 @@ impossible_if(affix_label(Robot, Object), 53) :-
 %%%%%%%%%%% 6. Core domain functions %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Important: This function is used by the qRRL system, and must be defined in each domain.
 % Observed unexpected state: Fluents depend on target action
 setObservedUnexpectedState :-
 	assert(lastActionWas(none)),
@@ -391,6 +392,7 @@ setObservedUnexpectedState :-
 	unexpectedStateFluents(S),
 	assertFluents(S).
 
+% Important: This function is used by the qRRL system, and must be defined in each domain.
 % The state is reset at random for each sequence of episodes.
 resetStateAtRandom :-
 	assert(lastActionWas(none)),
@@ -443,6 +445,7 @@ randomiseAllLocations([A|B]) :-
 	assert(currentState(fluent(F))),
 	randomiseAllLocations(B).
 
+% Important: This function is used by the qRRL system, and must be defined in each domain.
 % Returns all physical states, even if they break constraints
 getTheoreticalStatePermutation(List) :-
 	try_all_locations([p0,p1,p2,rob1,book1,cup1],[p0,p1,p2,rob1],[rmwor,rmoff,rmlib],[],List).
