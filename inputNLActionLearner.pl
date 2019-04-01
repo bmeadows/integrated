@@ -1,9 +1,11 @@
-:- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1, recurseOnDescs/1.
+:- dynamic obs_ex_action/3, obs_ex_action_tagged/3, exoActionDescription/4, args/1, recurseOnDescs/1, action_syntax/3.
 
 % Includes
 :- include('wordnet/wn_s.pl').
 :- include('wordnet/wn_sim.pl').
-:- [verbs,rrl_domain,pretty_printer].
+:- include('wordnet/wn_hyp.pl').
+:- [verbs,pretty_printer,domain].
+% :- [rrl_domain] Does not match current domain version
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -54,12 +56,14 @@ exoActionDescription(balance(_9442,_9444,_9446),[_9442,_9444,_9446],[engineer,cu
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 learnFromActionDesc(ReturnedAction) :-
-	obs_ex_action_tagged(A,B,C),
+	obs_ex_action_tagged(A,B,C), % Asserted at the point in the control loop when the system is given a new exogenous action description
 	learnFromActionDescs([A,B,C], ReturnedAction),
 	!.
 learnFromActionDesc(no_action_to_learn).
 
-%1. Check an entire buffer of unprocessed observations from the previous cycle (or... on interrupt) for tuples <string, [0 or more logical literals]>
+% Check an entire buffer of unprocessed observations from the previous cycle (or... on interrupt) for tuples <string, [0 or more logical literals]>
+% (Deprecated under the assumption that new action learning opportunities are always dealt with immediately, first drawing the robot's attention, never stored up.)
+/*
 learnFromDescs :-
 	findall([A,B,C], obs_ex_action_tagged(A,B,C), X),
 	X=[Head|Tail],
@@ -69,9 +73,9 @@ learnFromDescs :-
 	learnFromActionDescs(Head),
 	retractall(obs_ex_action_tagged(_,_,_)).
 learnFromDescs.
+*/
 
-%2. Perform the following for each tuple in turn
-%3. Parse string into list of POS-tagged words
+% Parse string into list of POS-tagged words
 learnFromActionDescs([], learning_finished) :- !.
 learnFromActionDescs(A, Head) :-
 	A = [String,LiteralEffects,_Step],
@@ -80,24 +84,91 @@ learnFromActionDescs(A, Head) :-
 	prettyprintln(String),
 	prettyprintstars,
 	split_string(String, " ", "", WordsList),
-	divideTags(WordsList, PairsListRev),
+	divideTags(WordsList, PairsListRev), % Splits each substring into a pair of the word and its tag by finding "_"
 	reverse(PairsListRev, PairsListTotal),
 	prettyprint('Learning from: '),
 	prettyprintln(PairsListTotal),
 	%4. Pick out verb as action predicate
-	(once(select([Verb,"VBG"], PairsListTotal, PairsListElided)) -> true ; trace), % VBZ / VBG, depends
+	(select(["is","VBZ"], PairsListTotal, PairsListNext) -> true ; PairsListNext = PairsListTotal),
+	
+	((member([Verb,VTAG], PairsListNext), (VTAG = "VBG" ; VTAG = "VBZ" ; VTAG = "VBN" ; VTAG = "VBD")) % VBZ / VBG, depends
+	->
+	(append(PairsList1,PairsList2,PairsListNext), append(AgentDescriptionList,[[Verb,VTAG]],PairsList1))
+	;
+	(prettyprintln('Failure finding verb in input!'), trace, fail)),
+
 	standardizeVerb(Verb,Action),
-	prettyprint('Verb: '),
+	prettyprint('Verb isolated: '),
 	prettyprintln(Action),
-	%5. Pick out sequences of 0 or more adjectives followed by a noun as static attribute values followed by an object sort
-	extractObjectDescriptions(PairsListElided, ObjectDescriptions),
-	prettyprint('Object descriptions: '),
-	prettyprintln(ObjectDescriptions),
-	%6. For each such sequence, determine static attributes from values (assume unambiguous)
-	%7. For each such sequence, search knowledge of objects for one with correct sort and attribute-value pairs; take first match (assumes uniqueness)
-	getOrderedListOfObjectSymbols(ObjectDescriptions, ObjectClassPredicates, OrderedList),
-	prettyprint('Objects identified: '),
-	prettyprintln(OrderedList),
+	prettyprintln(''),
+	% 5. Next, work back through the sentence template used for explanation:
+	%    "[actor] [verb past tense] [object1] {to [object2]} {by [object3]} {with [object4]} {and [object5]}"
+	% We assume that human-provided instructions take this form.
+	% 5.(a) If the current pairs list contain the pair ["and", _Tag], separate out the remainder list as Object5, else no Object5 (empty list)
+	(member(["and",AndVar], PairsList2)
+	->
+	(append(L2,Object5,PairsList2), append(PairsList3,[["and",AndVar]],L2))
+	;
+	(Object5 = [], PairsList3 = PairsList2)
+	),
+	!, % Assume at most one "and"
+	% 5.(b) If the current pairs list contain the pair ["with", _Tag], separate out the remainder list as Object4, else no Object4 (empty list)
+	(member(["with",WithVar], PairsList3)
+	->
+	(append(L3,Object4,PairsList3), append(PairsList4,[["with",WithVar]],L3))
+	;
+	(Object4 = [], PairsList4 = PairsList3)
+	),
+	!, % Assume at most one "with"
+	% 5.(c) If the current pairs list contain the pair ["by", _Tag], separate out the remainder list as Object3, else no Object3 (empty list)
+	(member(["by",ByVar], PairsList4)
+	->
+	(append(L4,Object3,PairsList4), append(PairsList5,[["by",ByVar]],L4))
+	;
+	(Object3 = [], PairsList5 = PairsList4)
+	),
+	!, % Assume at most one "by"
+	% 5.(d) If the current pairs list contain the pair ["to", _Tag], separate out the remainder list as Object2, else no Object2 (empty list)
+	(member(["to",ToVar], PairsList5)
+	->
+	(append(L5,Object2,PairsList5), append(PairsList6,[["to",ToVar]],L5))
+	;
+	(Object2 = [], PairsList6 = PairsList5)
+	),
+	!, % Assume at most one "to"
+	
+	% 6. If the current pairs list contains an object, extract it as Object1
+	extractObjectDescription(PairsList6, RemainderObjectDesc),
+	getObjectSymbol(RemainderObjectDesc, Object1Pred, Object1Symbol),
+	!,
+	
+	% 7. AgentDescriptionList is required to contain an object
+	extractObjectDescription(AgentDescriptionList, AgentDesc),
+	getObjectSymbol(AgentDesc, AgentPred, ActorSymbol),
+	!,
+	prettyprint('Actor isolated: '),
+	prettyprintln(ActorSymbol),
+	prettyprintln(''),
+
+	% 7. Now for each field Object2-6 that is nonempty, must be able to reduce it to a single object symbol.
+	(Object1Symbol = [] -> (Syntax1 = []) ; Syntax1 = [object1]),
+	(Object2 = [] -> (Predicate2 = [], Symbol2 = [], Syntax2 = Syntax1) ; (extractObjectDescription(Object2, ObjDescription2), getObjectSymbol(ObjDescription2, Predicate2, Symbol2), append(Syntax1, [object2], Syntax2))),
+	(Object3 = [] -> (Predicate3 = [], Symbol3 = [], Syntax3 = Syntax2) ; (extractObjectDescription(Object3, ObjDescription3), getObjectSymbol(ObjDescription3, Predicate3, Symbol3), append(Syntax2, [object3], Syntax3))),
+	(Object4 = [] -> (Predicate4 = [], Symbol4 = [], Syntax4 = Syntax3) ; (extractObjectDescription(Object4, ObjDescription4), getObjectSymbol(ObjDescription4, Predicate4, Symbol4), append(Syntax3, [object4], Syntax4))),
+	(Object5 = [] -> (Predicate5 = [], Symbol5 = [], Syntax5 = Syntax4) ; (extractObjectDescription(Object5, ObjDescription5), getObjectSymbol(ObjDescription5, Predicate5, Symbol5), append(Syntax4, [object5], Syntax5))),
+	
+	% 8. Now assert a new action_syntax(Action, VerbPastTense, [List])
+	ObjSyntaxList = Syntax5,
+	standardizeVerbToPast(Verb,PastTense),
+	(action_syntax(Action, PastTense, ObjSyntaxList) -> true ; asserta(action_syntax(Action, PastTense, ObjSyntaxList))), % Do not re-add the learned language template upon refinement of the concept
+
+	% Bookkeeping
+	OrderedListInit = [ActorSymbol, Object1Symbol, Symbol2, Symbol3, Symbol4, Symbol5],
+	flatten(OrderedListInit, OrderedList),
+	
+	ClassPredListInit = [AgentPred, Object1Pred, Predicate2, Predicate3, Predicate4, Predicate5],
+	flatten(ClassPredListInit,ObjectClassPredicates), % When the input did not include a particular syntactic field, removes the empty list associated with that field
+	
 	% Create instantiated head for new action
 	length(OrderedList, Length),
 	functor(Head, Action, Length),
@@ -159,17 +230,17 @@ args_to_strings([A|B], [NewElement|StringArgList]) :-
 
 recursive_capitalise_arg_strings(ResultsHead, ResultsEffects, [], ResultsHead, ResultsEffects).
 recursive_capitalise_arg_strings(HeadString, EffectsString, [StringArg|B], ResultsHead, ResultsEffects) :-
-	% capitalised form of StringArg is StringArgCAPS... prefix with either '(' or ',' to try to prevent constant name overlap, e.g. 'b1' and 'rob1'
+	% Capitalised form of StringArg is StringArgCAPS... prefix with either '(' or ',' to try to prevent constant name overlap, e.g. 'b1' and 'rob1'
 	string_concat("(", StringArg, StringArg1),
 	string_upper(StringArg1,StringArgCAPS1),
 	string_concat(",", StringArg, StringArg2),
 	string_upper(StringArg2,StringArgCAPS2),
-	% change HeadString to HeadString2 by replacing each occurrence of StringArg in it with StringArgCAPS
+	% Change HeadString to HeadString2 by replacing each occurrence of StringArg in it with StringArgCAPS
 	split_string_custom(HeadString, StringArg1, HeadStringL),
 	joinStrings(HeadStringL,StringArgCAPS1,HeadStringL0),
 	split_string_custom(HeadStringL0, StringArg2, HeadStringL1),
 	joinStrings(HeadStringL1,StringArgCAPS2,HeadString2),
-	% change EffectsString to EffectsString2 by replacing each occurrence of StringArg in it with StringArgCAPS
+	% Change EffectsString to EffectsString2 by replacing each occurrence of StringArg in it with StringArgCAPS
 	split_string_custom(EffectsString, StringArg1, EffectsStringL),
 	joinStrings(EffectsStringL,StringArgCAPS1,EffectsStringL0),
 	split_string_custom(EffectsStringL0, StringArg2, EffectsStringL1),
@@ -245,7 +316,6 @@ firstCommonAncestor(Pred1, Pred2, A) :-
 	!.
 
 
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 divideTags(WordsList, PairsList) :-
@@ -253,22 +323,38 @@ divideTags(WordsList, PairsList) :-
 
 divideTagsRecursively([], FinalList, FinalList).
 divideTagsRecursively([Word|B], TempList, PairsList) :-
-	split_string(Word, "_", "", WordTypePair),
-	append([WordTypePair], TempList, NewTempList),
+	split_string(Word, "_", "", [FirstPart,SecondPart]),
+	string_lower(FirstPart, FirstPartLower), % Set all letters to lowercase
+	append([[FirstPartLower,SecondPart]], TempList, NewTempList),
 	divideTagsRecursively(B, NewTempList, PairsList).
 	
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-standardizeVerb(V,Pred) :-
-	term_string(VTerm, V),
-	vb(Pred, List),
-	member(VTerm,List),
+standardizeVerb(VString, ReturnSymbol) :-
+	term_string(VTerm, VString),
+	vb(ReturnSymbol, List),
+	member(VTerm, List),
 	!.
-standardizeVerb(V,Pred) :-
-	term_string(Pred, V).
+standardizeVerb(VString, ReturnSymbol) :-
+	term_string(ReturnSymbol, VString).
+
+% Imprecise: The verb list stores most but not all verbs in a form with past tense last
+standardizeVerbToPast(VString, ReturnSymbol) :-
+	term_string(VTerm, VString),
+	vb(VTerm, List),
+	last(List, ReturnSymbol),
+	!.
+standardizeVerbToPast(VString, ReturnSymbol) :-
+	term_string(VTerm, VString),
+	(vb(_SomeVerb, List), member(VTerm, List)),
+	last(List, ReturnSymbol),
+	!.
+standardizeVerbToPast(VString, ReturnSymbol) :- % If verb cannot be found, default to adding suffix "-ed" to verb used
+	string_concat(VString, "ed", NewString),	
+	term_string(ReturnSymbol, NewString).
 
 /*
-Need to use a corpus of English words to get the correct verb form. It would be easier for verb tense 'x foos y': can just use string manipulation:
+Need to use a corpus of English words to get the correct verb form. It would be easier for input verb tense 'x foos y': can just use string manipulation:
 
 % Case 1: sses -> ss
 standardizeVerb(V,Pred) :-
@@ -302,64 +388,63 @@ standardizeVerb(V,Pred) :-
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-extractObjectDescriptions(Pairs, ObjectDescriptions) :-
-	extractObjectDescriptionsRecursively(Pairs, [], [], ObjectDescriptions).
+% ReturnedObjectDescription is a list of nouns and adjectives describing a single object, beginning with the final descriptor (most likely to correspond to sort).
+extractObjectDescription(Pairs, ReturnedObjectDescription) :-
+	extractObjectDescriptionRecursively(Pairs, [], ReturnedObjectDescription).
 
-extractObjectDescriptionsRecursively([], [], FinalDescs, FinalDescs).
-extractObjectDescriptionsRecursively([Pair|B], WorkingAds, WorkingDescs, FinalDescs) :-
-	% Pair is noun: append WorkingAds to it, add to WorkingDescs, and continues
-	Pair = [Word, "NN"],
+extractObjectDescriptionRecursively([], FinalDesc, FinalDesc).
+extractObjectDescriptionRecursively([Pair|B], Working, FinalDesc) :-
+	% Pair is noun or adjective
+	(Pair = [Word, "NN"] ; Pair = [Word, "JJ"]),
 	!,
-	append([Word], WorkingAds, Desc),
-	append([Desc], WorkingDescs, NewWorkingDescs),
-	extractObjectDescriptionsRecursively(B, [], NewWorkingDescs, FinalDescs).
-extractObjectDescriptionsRecursively([Pair|B], WorkingAds, WorkingDescs, FinalDescs) :-
-	% Pair is adjective: append to WorkingAds
-	Pair = [Word, "JJ"],
+	append([Word], Working, Desc),
+	extractObjectDescriptionRecursively(B, Desc, FinalDesc).
+extractObjectDescriptionRecursively([_|B], Working, FinalDesc) :-
+	% Base case - Pair is irrelevant; discard it
 	!,
-	append([Word], WorkingAds, NewWorkingAds),
-	extractObjectDescriptionsRecursively(B, NewWorkingAds, WorkingDescs, FinalDescs).
-extractObjectDescriptionsRecursively([_|B], WorkingAds, WorkingDescs, FinalDescs) :-
-	% Base case - Pair is irrelevant
-	!,
-	extractObjectDescriptionsRecursively(B, WorkingAds, WorkingDescs, FinalDescs).
-	
+	extractObjectDescriptionRecursively(B, Working, FinalDesc).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%6. For each such sequence, determine static attributes from values (assume unambiguous)
-%7. For each such sequence, search knowledge of objects for one with correct sort and attribute-value pairs; take first match (assumes uniqueness)
-getOrderedListOfObjectSymbols(ObjectDescriptions, ObjectClassPredicates, OrderedList) :-
-	getOrderedListOfObjectSymbolsRecursive(ObjectDescriptions, [], [], ObjectClassPredicates, OrderedList).
-
-getOrderedListOfObjectSymbolsRecursive([], Final1, Final2, Final1, Final2).
-getOrderedListOfObjectSymbolsRecursive([Description|B], WorkingList1, WorkingList2, ObjectClassPredicates, OrderedList) :-
-	Description = [Noun|Adjs],
-	term_string(InitialPred, Noun),
-	translateNounThroughWordNet(InitialPred,Predicate),
-	functor(Term, Predicate, 1),
-	domain(sort(Term)),
-	% !, % Can't cut here to get ancestor sorts because it needs to backtrack to try e.g. person(p1), person(p2), etc, as well as to try different wordnet senses of the noun class itself
+getObjectSymbol([], [], []) :- !.
+getObjectSymbol(ObjectDescription, ObjectSortReturned, ObjectSymbolReturned) :-
+	ObjectDescription = [PresumedNounString|RemainderDescription],
+	term_string(PresumedNoun, PresumedNounString),
+	translateNounThroughWordNet(PresumedNoun, WordNetNoun),
+	functor(Term, WordNetNoun, 1),
+	sort(Term),
+	% !, % Can't cut here to get ancestor sorts because it needs to backtrack to try e.g. person(p1), person(p2), etc, as well as to try different WordNet senses of the noun class itself
 	arg(1, Term, ObjectSymbol),
-	changeAdjsToTermsAndCheckRecursive(ObjectSymbol, Adjs),
-	append([Predicate], WorkingList1, NewWorkingList1),
-	append([ObjectSymbol], WorkingList2, NewWorkingList2),
-	getOrderedListOfObjectSymbolsRecursive(B, NewWorkingList1, NewWorkingList2, ObjectClassPredicates, OrderedList).
+	changeAdjsOrNounsToTermsAndCheckRecursive(ObjectSymbol, RemainderDescription),
+	ObjectSortReturned = WordNetNoun,
+	ObjectSymbolReturned = ObjectSymbol,
+	!.
+% Alternative case: Final descriptor does not correspond to a sort, but to a static attribute like the other descriptors (assume that human-provided input will uniquely pick out a domain object).
+getObjectSymbol(ObjectDescription, ObjectSortReturned, ObjectSymbolReturned) :-
+	sort(Term),
+	functor(Term, SomeSort, 1),
+	arg(1, Term, ObjectSymbol),
+	changeAdjsOrNounsToTermsAndCheckRecursive(ObjectSymbol, ObjectDescription),
+	ObjectSortReturned = SomeSort,
+	ObjectSymbolReturned = ObjectSymbol,
+	!.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+changeAdjsOrNounsToTermsAndCheckRecursive(_, []).
+changeAdjsOrNounsToTermsAndCheckRecursive(ObjectSymbol, [Adj|B]) :-
+	translateT(Adj, InitialValue, 0),
+	translateAdjThroughWordNet(InitialValue,FinalValue),
+	domain_attr(Term),
+	functor(Term, _SomePredicate, 2),
+	arg(1, Term, ObjectSymbol),
+	arg(2, Term, FinalValue),
+	prettyprint(' => '), prettyprintln(Term),
+	changeAdjsOrNounsToTermsAndCheckRecursive(ObjectSymbol, B).
 
 translateT(Word, Term, N) :-
 	term_string(Pred, Word),
 	functor(Term, Pred, N).
-	
-changeAdjsToTermsAndCheckRecursive(_, []).
-changeAdjsToTermsAndCheckRecursive(ObjectSymbol, [Adj|B]) :-
-	translateT(Adj, InitialValue, 0),
-	translateAdjThroughWordNet(InitialValue,FinalValue),
-	valid(attr(Term)),
-	functor(Term, _SomePredicate, 2),
-	arg(1, Term, ObjectSymbol),
-	arg(2, Term, FinalValue),
-	domain(attr(Term)),
-	prettyprint(' => '), prettyprintln(Term),
-	changeAdjsToTermsAndCheckRecursive(ObjectSymbol, B).
 
 % Note n = noun
 translateNounThroughWordNet(FinalValue,FinalValue).
@@ -383,8 +468,14 @@ translateAdjThroughWordNet(InitialValue,FinalValue) :- % Similar adjectival sens
 	s(Synset2, _RankInSynsetF, FinalValue, Type2, _SenseNumberF, _TagCountF),
 	(Type2 = s ; Type2 = a),
 	InitialValue \= FinalValue.
+translateAdjThroughWordNet(InitialValue,FinalValue) :- % Hypernym or hyponym
+	s(Synset1,_,InitialValue,Type1,_,_),
+	(Type1 = s ; Type1 = a),
+	(hyp(Synset1, Synset2) ; hyp(Synset2, Synset1)), 
+	s(Synset2,_,FinalValue,Type2,_,_),
+	(Type2 = s ; Type2 = a),
+	InitialValue \= FinalValue.
 
-translateLearnedActionDescsToPrologRules :- !. % TODO
 translateLearnedActionDescsToPrologRules :-
        tell('learned_action_descs.pl'),
        listing(exoActionDescription/4),
@@ -392,3 +483,82 @@ translateLearnedActionDescsToPrologRules :-
        %tell('exogenous_events.pl'),
        %listing(hpd/2),
        %told.
+translateLearnedActionDescsToPrologRules :- !. % TODO
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Note 2019-03-27
+% The following (the remainder of this file) consists of older formulations of functions given above, not used in this version of the code.
+% => extractObjectDescriptions_DEPRECATED is a conservative version of extractObjectDescription that operates over a string which may contain MULTIPLE object descriptions.
+%    It also strictly finds sequences of one or more words tagged "JJ" (adjective) followed by a single word tagged "NN" (noun).
+% => getOrderedListOfObjectSymbols_DEPRECATED is a conservative version of getObjectSymbol that takes as input MULTIPLE object description lists starting with exactly one noun.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+extractObjectDescriptions_DEPRECATED(Pairs, ObjectDescriptions) :-
+	extractObjectDescriptionsRecursively_DEPRECATED(Pairs, [], [], ObjectDescriptions).
+
+extractObjectDescriptionsRecursively_DEPRECATED([], [], FinalDescs, FinalDescs).
+extractObjectDescriptionsRecursively_DEPRECATED([Pair|B], WorkingAds, WorkingDescs, FinalDescs) :-
+	% Pair is noun: append WorkingAds to it, add to WorkingDescs, and continue
+	Pair = [Word, "NN"],
+	!,
+	append([Word], WorkingAds, Desc),
+	append([Desc], WorkingDescs, NewWorkingDescs),
+	extractObjectDescriptionsRecursively_DEPRECATED(B, [], NewWorkingDescs, FinalDescs).
+extractObjectDescriptionsRecursively_DEPRECATED([Pair|B], WorkingAds, WorkingDescs, FinalDescs) :-
+	% Pair is adjective: append to WorkingAds
+	Pair = [Word, "JJ"],
+	!,
+	append([Word], WorkingAds, NewWorkingAds),
+	extractObjectDescriptionsRecursively_DEPRECATED(B, NewWorkingAds, WorkingDescs, FinalDescs).
+extractObjectDescriptionsRecursively_DEPRECATED([_|B], WorkingAds, WorkingDescs, FinalDescs) :-
+	% Base case - Pair is irrelevant; discard it
+	!,
+	extractObjectDescriptionsRecursively_DEPRECATED(B, WorkingAds, WorkingDescs, FinalDescs).
+
+% For each sequence, determine static attributes from values (assume unambiguous)
+% And for each sequence, search knowledge of objects for one with correct sort and attribute-value pairs; take first match (assumes uniqueness)
+getOrderedListOfObjectSymbols_DEPRECATED(ObjectDescriptions, ObjectClassPredicates, OrderedList) :-
+	getOrderedListOfObjectSymbolsRecursive_DEPRECATED(ObjectDescriptions, [], [], ObjectClassPredicates, OrderedList).
+
+getOrderedListOfObjectSymbolsRecursive_DEPRECATED([], Final1, Final2, Final1, Final2).
+getOrderedListOfObjectSymbolsRecursive_DEPRECATED([Description|B], WorkingList1, WorkingList2, ObjectClassPredicates, OrderedList) :-
+	Description = [Noun|Adjs],
+	term_string(InitialPred, Noun),
+	translateNounThroughWordNet(InitialPred,Predicate),
+	functor(Term, Predicate, 1),
+	
+	sort(Term),
+	% !, % Can't cut here to get ancestor sorts because it needs to backtrack to try e.g. person(p1), person(p2), etc, as well as to try different WordNet senses of the noun class itself
+	arg(1, Term, ObjectSymbol),
+	changeAdjsToTermsAndCheckRecursive(ObjectSymbol, Adjs),
+	
+	append([Predicate], WorkingList1, NewWorkingList1),
+	append([ObjectSymbol], WorkingList2, NewWorkingList2),
+	getOrderedListOfObjectSymbolsRecursive_DEPRECATED(B, NewWorkingList1, NewWorkingList2, ObjectClassPredicates, OrderedList).
+
+changeAdjsToTermsAndCheckRecursive(_, []).
+changeAdjsToTermsAndCheckRecursive(ObjectSymbol, [Adj|B]) :-
+	translateT(Adj, InitialValue, 0),
+	translateAdjThroughWordNet(InitialValue,FinalValue),
+	domain_attr(Term),
+	functor(Term, _SomePredicate, 2),
+	arg(1, Term, ObjectSymbol),
+	arg(2, Term, FinalValue),
+	prettyprint(' => '), prettyprintln(Term),
+	changeAdjsToTermsAndCheckRecursive(ObjectSymbol, B).
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%

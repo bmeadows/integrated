@@ -35,7 +35,7 @@ construct_sp_file(File) :-
 % The following parts can be considered static; read them directly from a file
 
 readwrite_predicates(File) :-
-	direct_readwrite('predicates.txt', File).
+	direct_readwrite('pr_predicates.txt', File).
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %
  % % % % % % % % % % % % % % % % % % % % % % % % % %
@@ -54,7 +54,7 @@ readwrite_preamble(File) :-
 	write(O, "."),
 	close(O),
 	*/
-	direct_readwrite('preamble.txt', File).
+	direct_readwrite('pr_preamble.txt', File).
 /* Deprecated
 	open(File, append, O2),
 	write(O2, "#step = "),
@@ -62,14 +62,14 @@ readwrite_preamble(File) :-
 	write(O2, "..numSteps."),
 	close(O2).
 */
-	
+
 
 /*
 Use internal list of valid actions, which can be extended through learning.
 Also includes exoactions, which must be given dynamically.
 */
 readwrite_actions(File) :-
-	%direct_readwrite('actions.txt', File),
+	%direct_readwrite('pr_actions.txt', File),
 	writeExoActions(File),
 	open(File, append, O),
 	writeln(O, "#action = #agentaction + #learned_exoaction."),
@@ -103,7 +103,7 @@ write_exogenous_and_create_causal_laws(O, Action) :-
 	write(O, "("),
 	writeExoSorts(O, Sorts),
 	write(O, ")"),
-	record_causal_laws(Head, Results).
+	record_causal_laws_for_exoactions(Head, Results).
 	
 writeExoSorts(O, [A,B|Tail]) :-
 	!,
@@ -117,30 +117,30 @@ writeExoSorts(O, [A]) :-
 
 
 % Record exoactions' causal laws for later addition to ASP program
-record_causal_laws(Head, Results) :-
+record_causal_laws_for_exoactions(Head, Results) :-
 	retractall(cl_rec(_, _)),
-	record_causal_laws_each(Head, Results),
+	record_causal_laws_exos_each(Head, Results),
 	cleanuptemp.
 	
 cleanuptemp :-
-	delete_file('temp.txt'), !.
+	delete_file('pr_temp.txt'), !.
 cleanuptemp.
 
-record_causal_laws_each(_Head, []).
-record_causal_laws_each(Head, [A|B]) :-
+record_causal_laws_exos_each(_Head, []).
+record_causal_laws_exos_each(Head, [A|B]) :-
 	establish_causal_law_for_learned_action(Head, A, String),
 	assert(cl_rec(String)),
-	record_causal_laws_each(Head, B).
+	record_causal_laws_exos_each(Head, B).
 
 establish_causal_law_for_learned_action(Head, not(Outcome), ReturnString) :-
 	!,
 	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
 	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
-	open('temp.txt', write, O),
+	open('pr_temp.txt', write, O),
 	write(O, Clause),
 	writeln(O, "."),
 	close(O),
-	read_file_to_string('temp.txt', String1, []),
+	read_file_to_string('pr_temp.txt', String1, []),
 	split_string(String1, ":", "-", [StringHead, StringTail]),
 	string_concat(StringHead, " :- ", ST),
 	string_concat("-", ST, ST2), % Negated head. Add now to prevent "-" being removed in splitting
@@ -149,11 +149,11 @@ establish_causal_law_for_learned_action(Head, Outcome, ReturnString) :-
 	!,
 	Clause = (holds(Outcome,Time +1) :- occurs(Head,Time)),
 	numbervars(Clause), % Doing this means writing it out should retain alphabetical variable names
-	open('temp.txt', write, O),
+	open('pr_temp.txt', write, O),
 	write(O, Clause),
 	writeln(O, "."),
 	close(O),
-	read_file_to_string('temp.txt', String1, []),
+	read_file_to_string('pr_temp.txt', String1, []),
 	split_string(String1, ":", "-", [StringHead, StringTail]),
 	string_concat(StringHead, " :- ", ST),
 	string_concat(ST, StringTail, ReturnString).
@@ -165,12 +165,12 @@ Axioms: Use existing ASP file, and then add learned causal laws and executabilit
 */
 /*
 Attributes: While static, these should be generated from a single central data store.
-RRL purports to change statics, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
+RRL does purport to change statics, but consider that to be relabelling or interacting with a simulation; any actual changes it makes should be reverted.
 Or better yet, the RRL module should have access to a list of literals that may be originally derived from the true list, but not actually the robot's model of the world.
 */
 readwrite_axioms(File) :-
 	write_exogenous_causal_laws(File),
-	direct_readwrite('axioms.txt', File),
+	direct_readwrite('pr_axioms.txt', File),
 	add_domain_attributes(File).
 
 write_exogenous_causal_laws(File) :-
@@ -189,18 +189,19 @@ write_cl_recs(O) :-
 write_cl_recs(_) :- !.
 
 /*
-List of what holds.
-I suppose the terms are passed back and forth between ASP and other modules?
-And then added to with observations here.
-Plus goal, if it exists.
-ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed. But how to evaluate when goal is met, so remove?
+Create the list of what holds.
+- Terms passed back and forth between ASP and other modules?
+- And then added to with observations here.
+- Also the goal, if it exists.
+- Note ASP never CHANGES the goal, so can just store it locally and pass it to ASP whenever needed.
+- But how to evaluate when goal is met, therefore remove it?
 */
 readwrite_current_state_and_goal(File) :-
 	%add_holds_at_zero(File),
 	add_obs(File),
 	add_hpd(File),
 	add_goal(File),
-	direct_readwrite('state_goal_display.txt', File).
+	direct_readwrite('pr_state_goal_display.txt', File).
 
 %holds_at_zero(L) -> holds(L,0)
 /*add_holds_at_zero(File) :-
@@ -227,6 +228,7 @@ add_hpd(File) :- % Includes exoactions
 
 add_goal(File) :-
 	open(File, append, O),
+	trace,
 	currentGoal(Goal),
 	(atom(Goal)
 	->
@@ -258,8 +260,9 @@ Change this to include in the printed portion of the answer set
 - what doesn't hold (including e.g. inertia)
 
 readwrite_display(File) :-
-	direct_readwrite('display.txt', File).
+	direct_readwrite('pr_display.txt', File).
 */
+
 
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % %

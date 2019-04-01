@@ -14,7 +14,8 @@ answer_set_goal/1, expected_effects/3, user_alerted_interruption/0.
 %holds_at_zero/1
 
 inPlanMode(true).
-learningMode(off). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
+%learningMode(off). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
+learningMode(on). % rrlForSpecificUnexpectedTransition, activeExplorationRRLOrActionLearning
 os(windows).
 last_transitions_failed(false).
 
@@ -25,6 +26,7 @@ test :-
 currentTime(0).
 currentTime_unaltered(5). % Not considering history resets
 %number_of_ASP_steps_to_lookahead(5).
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -55,20 +57,20 @@ get_observations :-
 	prettyprint('['),
 	prettyprint(TU),
 	% Note that the last step's action and its effects will only be observed if default or next is chosen
-	prettyprintln(']. Please give Prolog list of observations (or string encoding goal, or "d." for default, or "i." for default+interruption, or "n." for next from list): '),
+	prettyprintln(']. Please give Prolog list of observations (or string encoding goal, or "d." for default, or "i." for default+interruption, or "n." for next from list, or "e." to exit control loop): '),
 	read(Input),
 	prettyprintln(' '),
 	process_observations(Input).
 	
+process_observations(e) :- !, abort.
 process_observations(d) :- !, confirm_expected_effects.
 process_observations(n) :- !, prettyprintln('TODO: List input!'), trace.
 process_observations(i) :- !, assert(user_alerted_interruption), confirm_expected_effects.
 process_observations([_A|_B]) :- !, prettyprintln('TODO: Observation list!'), trace.
-process_observations(X) :- string(X), assert(user_alerted_interruption), currentGoal(Current), prettyprint('Removing goal:  '), prettyprintln(Current), retractall(currentGoal(_)), assert(currentGoal(X)), prettyprint('Adding goal:    '), prettyprintln(X), !.
-process_observations(X) :- atom(X),   assert(user_alerted_interruption), currentGoal(Current), prettyprint('Removing goal:  '), prettyprintln(Current), retractall(currentGoal(_)), assert(currentGoal(X)), prettyprint('Adding goal:    '), prettyprintln(X), !.
+process_observations(X) :- (string(X) ; atom(X)), assert(user_alerted_interruption), currentGoal(Current), prettyprint('Removing goal:  '), prettyprintln(Current), retractall(currentGoal(_)), assert(currentGoal(X)), prettyprint('Adding goal:    '), prettyprintln(X), !.
 process_observations(_) :- get_observations.
 
-% Anticipated effects of last cycle's actions are put into form obs(X,true,newtime) for ASP if 'default' or 'next' is chosen
+% Anticipated effects of last cycle's actions are put into the form obs(X,true,newtime) for ASP if 'default' or 'next' is chosen
 confirm_expected_effects :-
 	currentTime(TNew),
 	TOld is TNew-1,
@@ -90,16 +92,16 @@ expected_to_obs([not(fluent(A))|B],T) :-
 	assert(obs(A,false,T)),
 	expected_to_obs(B,T).
 
-	
-	
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%% Section 3: Main %%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 	
 interior_loop :-
 	inPlanMode(false),
-	interrupted, % New goal just assigned, or forced to plan. Assumption: The robot never has to abandon a goal in favour of another one, so this can only happen when not planning.
-	prettyprintln('(interrupted)'),
+	interrupted_by_user, % New goal just assigned, or forced to plan. Assumption: The robot never has to abandon a goal in favour of another one, so this can only happen when not planning.
+	prettyprintln('(interrupted by human on previous step)'),
 	reset_ASP_history([]),
 	!,
 	retractall(inPlanMode(_)),
@@ -157,6 +159,7 @@ execute_plan :-
 	reset_ASP_history([]).
 
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%% Section 4: Belief store %%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -171,8 +174,8 @@ exists_unachieved_goal :-
 	% e.g.2 Current time is 3. Answer set describes plan steps at times 0, 1, 2 such that goal is met at time 3. This includes observations of actions at times 0, 1, 2, so it does not re-plan these.
 	% So answer set includes {goal(3), goal(4), ...}. So goal is achieved, so exists_unachieved_goal is false.
 	
-	% Note this check only makes sense when in planning mode. e.g. Exoactions are learned actively, and occur on time steps, and ASP is called after each case to maintain consistency.
-	
+	% Note this check only makes sense when in planning mode. e.g., Exoactions are learned actively, and occur on time steps, and ASP is called after each case to maintain consistency.
+
 
 /*
 exists_unachieved_goal :-
@@ -191,8 +194,9 @@ all_achieved_goals([A|B]) :-
 	all_achieved_goals(B).
 */
 
+
 % TODO extend properly
-interrupted :-
+interrupted_by_user :-
 	user_alerted_interruption,
 	retractall(user_alerted_interruption).
 
@@ -201,13 +205,12 @@ explained_all_transitions_last_step :-
 
 % 1. Translate belief store to ASP file domain.sp
 % 2. Call SPARC (ASP) with     java -jar sparc.jar domain.sp -solver dlv -A > answersets.txt
-% 3. Take first(?) answer set from answersets.txt, translate to plan steps, and store them
-% 4. Get updated beliefs
+% 3. Take first answer set from answersets.txt, translate to plan steps, and store them
 % The batch command is necessary, as this fails under windows:     shell('cmd.exe java -jar sparc.jar robotassist.sp -solver dlv -A > net.txt', _ExitStatus).
 compute_answer_sets :-
-	construct_sp_file('domain.sp'), % 1
+	construct_sp_file('generated_domain.sp'), % 1
 	os(windows), shell('sparc.bat', _ExitStatus), % 2
-	translate_answer_sets('answersets.txt'). % 3
+	translate_answer_sets('generated_answersets.txt'). % 3
 
 translate_answer_sets(File) :-
 	read_file_to_string(File, "", []),
@@ -228,6 +231,7 @@ handle_answer_sets(List) :-
 	% 4. Update current beliefs
 	retractall(currently_believed_to_hold(_)),
 	assertallcurrent(Current),
+	
 	% 5. Get things that held at time zero
 	/*findall( Literal,
 			not(( member(SubList,List), not(member(holds(Literal,0),SubList)) )),
@@ -260,14 +264,12 @@ reset_times :-
 	retractall(currentTime(_)),
 	assert(currentTime(1)).
 	
-
 assertallgoals([]).
 assertallgoals([A|B]) :-
 	prettyprint('Adding goal: '),
 	prettyprintln(A),
 	assert(answer_set_goal(A)),
 	assertallgoals(B).
-	
 
 %assertallzero([]).
 %assertallzero([A|B]) :-
@@ -316,7 +318,7 @@ condition_believed(not(fluent(F))) :-
 condition_believed(fluent(F)) :-
 	currently_believed_to_hold(F),
 	!.
-% TODO ASP will not report static attributes, there is a separate store which is turned into the ASP program's attributes.
+% TODO ASP will not report static attributes; there is a separate store which is turned into the ASP program's attributes.
 % These are obviously fixed, as outside the RRL part.
 condition_believed(not(attr(A))) :-
 	not(domain_attr(A)),
@@ -342,19 +344,19 @@ check_verbal_cue('c') :-
 check_verbal_cue([A,B]) :-
 	!,
 	currentTime(C),
-	assert(obs_ex_action(A,B,C)).
+	assert(obs_ex_action_not_incorporated(A,B,C)).
 check_verbal_cue(_) :-
 	prettyprintln('Cue format not recognised. Expected: ["Sentence",[List,Of,Consequences]]; use "not" for negated consequences.'),
 	request_verbal_cue.
 
 
-/*
-obs_ex_action(	"The person is shunting the book.",
+/* Example:
+obs_ex_action_not_incorporated(	"The person is flinging the book.",
 					[loc(book1,rmoff)],
 					5).*/
 
 perform_active_action_learning :-
-	obs_ex_action(TextString,Cons,ObsTime),
+	obs_ex_action_not_incorporated(TextString,Cons,ObsTime),
 	tell('vocalisation.txt'),
 	write(TextString),
 	nl,
@@ -365,13 +367,17 @@ perform_active_action_learning :-
 	read_file_to_string('tagged.txt', TS, []),
 	atom_codes(TextString2,TS),
 	assert(obs_ex_action_tagged(TextString2,Cons,ObsTime)),
-	retract(obs_ex_action(TextString,Cons,ObsTime)),
+	retract(obs_ex_action_not_incorporated(TextString,Cons,ObsTime)),
 	learnFromActionDesc(ExtractedAction), % Finally, perform learning over tagged text descriptions
+	retract(obs_ex_action_tagged(TextString2,Cons,ObsTime)),
 	prettyprint('Interactively learned:    '),
 	prettyprintln(ExtractedAction),
 	collate_demonstrated_exoaction_consequences(Cons,ListOfExtraObsToSetAtNewZero),
 	reset_ASP_history(ListOfExtraObsToSetAtNewZero).
 % Previously recursive... when multiple verbal cues could be stored.
+
+%  We have chosen to immediately reset history after every instance of active learning from verbal cues. It might be more efficient to only reset after all active action learning has finished, 
+%  but then we would still need to ensure we e.g. reset before more demonstrations are given than time steps exist in the ASP model.
 
 collate_demonstrated_exoaction_consequences([],[]).
 collate_demonstrated_exoaction_consequences([not(A)|TailConsequences],[HeadReturn|TailReturn]) :-
@@ -382,7 +388,6 @@ collate_demonstrated_exoaction_consequences([A|TailConsequences],[HeadReturn|Tai
 	HeadReturn = obs(A,true,0),
 	!,
 	collate_demonstrated_exoaction_consequences(TailConsequences,TailReturn).
-
 
 /*
 addActiveLearnedObservations(ExtractedAction,Consequences,Time) :-
@@ -408,13 +413,16 @@ continue_exploratory_RRL :- trace.
 
 % TODO
 % [obs(A,true,0), obs(B,false,0), ...]
-reset_ASP_history(ListOfExtraObsToSetAtNewZero) :- trace.
+reset_ASP_history(_ListOfExtraObsToSetAtNewZero) :- true. % trace.
+
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-% assert(obs_ex_action("The unimportant engineer is polishing the metallic table.",[reflectivity(tab1,bright)],1)).
-% assert(obs_ex_action("The robot is polishing the desk.",[reflectivity(desk1,bright)],1)).
+% TEST 1:    assert(obs_ex_action_not_incorporated("The person is travelling to the library location.", [not(loc(p0,rmoff)), loc(p0,rmlib)],1)), perform_active_action_learning, listing(action_syntax/3).
+% TEST 2:    assert(obs_ex_action_not_incorporated("The person is going to the library.", [not(loc(p0,rmoff)), loc(p0,rmlib)],1)), perform_active_action_learning, listing(action_syntax/3).
+% TEST 3:    assert(obs_ex_action_not_incorporated("The person is sprinting to the library location.", [not(loc(p0,rmoff)), loc(p0,rmlib)],1)), perform_active_action_learning, listing(action_syntax/3).
+% TEST 4:    assert(obs_ex_action_not_incorporated("The person is delivering the robot to the library by the person.", [not(loc(p0,rmoff)), loc(p0,rmlib)],1)), perform_active_action_learning, listing(action_syntax/3).
+% TEST 5:    assert(obs_ex_action_not_incorporated("The person is delivering the robot to the library with the person and the person.", [not(loc(p0,rmoff)), loc(p0,rmlib)],1)), perform_active_action_learning, listing(action_syntax/3).

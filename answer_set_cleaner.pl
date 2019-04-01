@@ -1,4 +1,6 @@
 
+answer_set_file('a_s.txt').
+
 % Includes
 :- [pretty_printer].
 
@@ -40,12 +42,15 @@ printSets(false, Content) :-
 	length(Content,Num), prettyprint(Num),
 	prettyprintln(' set(s) remaining.').
 printSets(true, Content) :-
-	open('a_s.txt', write, O),
+	answer_set_file(ASF),
+	open(ASF, write, O),
 	printEachSet(O,Content),
 	close(O),
 	prettyprint('Answer sets cleaned. '),
 	length(Content,Num), prettyprint(Num),
-	prettyprintln(' set(s) remaining. Written out to a_s.txt').
+	prettyprint(' set(s) remaining. Written out to '),
+	prettyprint(ASF),
+	prettyprintln('.').
 printEachSet(_,[]).
 printEachSet(O,[A|B]) :-
 	writeln(O, A),
@@ -114,6 +119,4 @@ compareSteps(<, Arg1, _) :-	functor(Arg1, _Pred, 2), arg(2, Arg1, Value1), numbe
 								!. % Implicitly, Arg2 does not meet the conditions - wrong arity or not a number. So say it is larger and thus appears at the end of the list.
 compareSteps(COMP, Arg1, Arg2) :- compare(COMP, Arg1, Arg2).
 %%%%%%%%%%%%%%%%%%%%%%
-
-
 
