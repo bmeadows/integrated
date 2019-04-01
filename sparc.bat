@@ -1,4 +1,4 @@
-java -jar sparc.jar domain.sp -solver dlv -A > answersets.txt
+java -jar sparc.jar generated_domain.sp -solver dlv -A > generated_answersets.txt
 
 
 
